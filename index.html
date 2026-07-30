@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0b1220">
+    <meta name="description" content="Entenda uma transação cripto sem decifrar um explorador de blocos.">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="css/app.css">
+    <title>Tx Raio-X — Sua transação cripto em português claro</title>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Tx Raio-X, página inicial">
+        <span class="brand-mark" aria-hidden="true">TX</span>
+        <span>Tx Raio-X</span>
+      </a>
+      <div class="usage-pill" id="usage-pill" aria-live="polite">
+        <span class="usage-dot" aria-hidden="true"></span>
+        <span id="usage-text">2 análises grátis</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="eyebrow"><span aria-hidden="true">●</span> Leitura simples. Sem conectar carteira. Somente dados públicos da blockchain.</div>
+        <h1 id="hero-title">Descubra o que aconteceu com sua transação cripto.</h1>
+        <p class="hero-copy">
+          Cole o hash e receba uma explicação direta: status, taxa, valor nativo e,
+          quando reconhecidos, aprovações e eventos que merecem sua atenção.
+        </p>
+
+        <form class="analyzer-card" id="analyzer-form" novalidate>
+            <div class="field">
+              <label for="transaction-hash">Hash da transação</label>
+              <div class="input-shell">
+                <span class="input-icon" aria-hidden="true">#</span>
+                <input
+                  id="transaction-hash"
+                  name="transactionHash"
+                  type="text"
+                  inputmode="text"
+                  autocomplete="off"
+                  spellcheck="false"
+                  placeholder="0x..."
+                  aria-invalid="false"
+                  aria-describedby="hash-help hash-error"
+                >
+              </div>
+              <p class="field-help" id="hash-help">O hash é público. Nunca pediremos sua chave ou frase-semente.</p>
+              <p class="field-error" id="hash-error" role="alert"></p>
+            </div>
+
+            <div class="form-row">
+              <div class="field network-field">
+                <label for="network">Rede</label>
+                <div class="select-control">
+                  <select id="network" name="network">
+                    <option value="auto">Detectar automaticamente</option>
+                    <option value="ethereum">Ethereum</option>
+                    <option value="base">Base</option>
+                    <option value="arbitrum">Arbitrum</option>
+                    <option value="polygon">Polygon</option>
+                    <option value="bnb">BNB Chain</option>
+                  </select>
+                  <span class="select-arrow" aria-hidden="true"></span>
+                </div>
+              </div>
+              <button class="primary-button" id="analyze-button" type="submit">
+                <span class="button-label">Analisar transação</span>
+                <span class="button-spinner" aria-hidden="true"></span>
+              </button>
+            </div>
+
+            <button class="demo-button" id="demo-button" type="button">Ver exemplo — não usa análise grátis</button>
+        </form>
+
+        <button
+          class="wallet-toggle"
+          id="wallet-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="wallet-panel"
+        >
+          <span class="wallet-toggle-copy">
+            <small>Não tem o hash?</small>
+            <strong>Buscar pela carteira</strong>
+          </span>
+          <span class="wallet-toggle-arrow" aria-hidden="true">↓</span>
+        </button>
+
+          <section class="wallet-panel" id="wallet-panel" aria-labelledby="wallet-panel-title" hidden>
+            <div class="wallet-panel-heading">
+              <div>
+                <p class="section-label">Histórico público</p>
+                <h2 id="wallet-panel-title">Encontre seus últimos hashes.</h2>
+              </div>
+              <span class="free-action-badge" id="wallet-limit-label">Últimas 3 no acesso grátis</span>
+            </div>
+            <p class="wallet-panel-copy">
+              Cole o endereço público da Rabby ou de outra carteira EVM. Buscaremos as
+              transações normais mais recentes na rede selecionada.
+            </p>
+
+            <form id="wallet-form" novalidate>
+              <div class="field">
+                <label for="wallet-address">Endereço público da carteira</label>
+                <div class="input-shell">
+                  <span class="input-icon" aria-hidden="true">◇</span>
+                  <input
+                    id="wallet-address"
+                    name="walletAddress"
+                    type="text"
+                    inputmode="text"
+                    autocomplete="off"
+                    spellcheck="false"
+                    placeholder="0x..."
+                    aria-invalid="false"
+                    aria-describedby="wallet-help wallet-error"
+                  >
+                </div>
+                <p class="field-help" id="wallet-help">
+                  A busca é somente leitura. Não conectamos nem salvamos sua carteira.
+                </p>
+                <p class="field-error" id="wallet-error" role="alert"></p>
+              </div>
+
+              <div class="form-row">
+                <div class="field network-field">
+                  <label for="wallet-network">Rede</label>
+                  <div class="select-control">
+                    <select id="wallet-network" name="walletNetwork">
+                      <option value="ethereum">Ethereum</option>
+                      <option value="base">Base</option>
+                      <option value="arbitrum">Arbitrum</option>
+                      <option value="polygon">Polygon</option>
+                    </select>
+                    <span class="select-arrow" aria-hidden="true"></span>
+                  </div>
+                </div>
+                <button class="primary-button" id="wallet-search-button" type="submit">
+                  <span class="button-label">Buscar últimos hashes</span>
+                  <span class="button-spinner" aria-hidden="true"></span>
+                </button>
+              </div>
+            </form>
+
+            <div class="wallet-results" id="wallet-results" aria-live="polite" hidden>
+              <div class="wallet-results-heading">
+                <div>
+                  <strong id="wallet-results-title" tabindex="-1">Transações encontradas</strong>
+                  <span id="wallet-results-note"></span>
+                </div>
+                <div class="field sort-field">
+                  <label for="wallet-sort">Ordenar</label>
+                  <div class="select-control select-control-compact">
+                    <select id="wallet-sort" name="walletSort">
+                      <option value="desc">Mais recentes</option>
+                      <option value="asc">Mais antigas</option>
+                    </select>
+                    <span class="select-arrow" aria-hidden="true"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="transaction-list" id="transaction-list"></div>
+            </div>
+          </section>
+
+        <div class="trust-list" aria-label="Características de segurança">
+          <span>Sem cadastro</span>
+          <span>Sem conexão de carteira</span>
+          <span>Dados públicos da blockchain</span>
+        </div>
+      </section>
+
+      <section class="result-section" id="result-section" aria-labelledby="result-title" hidden>
+        <article class="result-card">
+          <div class="result-header">
+            <div>
+              <p class="result-kicker" id="result-kicker">Resultado da análise</p>
+              <h2 id="result-title" tabindex="-1"></h2>
+            </div>
+            <span class="status-badge" id="status-badge"></span>
+          </div>
+
+          <p class="result-summary" id="result-summary"></p>
+          <div class="detail-grid" id="detail-grid"></div>
+
+          <!-- [UI] Cada bloco detalhado recebe um nome acessível sem anunciar o card inteiro como live region. -->
+          <section class="result-subsection" id="decoded-section" aria-labelledby="decoded-title" hidden>
+            <h3 id="decoded-title">O que a chamada pediu</h3>
+            <div class="detail-grid" id="decoded-grid"></div>
+          </section>
+
+          <section class="result-subsection" id="movement-section" aria-labelledby="movement-title" hidden>
+            <h3 id="movement-title">Movimentações e permissões detectadas</h3>
+            <div class="movement-list" id="movement-list"></div>
+          </section>
+
+          <div class="alert-list" id="alert-list"></div>
+
+          <details class="technical-panel">
+            <summary>Ver detalhes técnicos</summary>
+            <div class="detail-grid" id="technical-grid"></div>
+          </details>
+
+          <div class="next-step">
+            <span class="next-step-icon" aria-hidden="true">→</span>
+            <div>
+              <strong>Próximo passo</strong>
+              <p id="next-step-text"></p>
+            </div>
+          </div>
+
+          <a class="explorer-link" id="explorer-link" href="#" target="_blank" rel="noopener noreferrer">
+            Conferir no explorador da rede ↗
+          </a>
+
+          <p class="result-disclaimer">
+            Esta é uma leitura informativa dos dados públicos da transação, não uma garantia de segurança.
+          </p>
+        </article>
+      </section>
+
+      <section class="price-section" aria-labelledby="price-title">
+        <div>
+          <p class="section-label">Beta fundador</p>
+          <h2 id="price-title">Teste duas vezes. Gostou? É menos que um cafezinho.</h2>
+          <p>Um único pagamento libera análises ilimitadas neste navegador enquanto o beta estiver disponível.</p>
+        </div>
+        <div class="price-card">
+          <span>Desbloqueio beta</span>
+          <strong><small>R$</small> 4,99</strong>
+          <span class="price-benefit">Análises ilimitadas · até <span data-wallet-premium-limit>10</span> transações por busca</span>
+          <button class="primary-button" id="price-unlock-button" type="button">Desbloquear por R$ 4,99</button>
+          <small>Pagamento único · sem assinatura · acesso local</small>
+        </div>
+      </section>
+
+      <section class="explanation-section" aria-labelledby="how-title">
+        <p class="section-label">Como funciona</p>
+        <h2 id="how-title">Do explorador técnico para uma resposta que faz sentido.</h2>
+        <div class="steps-grid">
+          <article>
+            <span>01</span>
+            <h3>Você cola o hash</h3>
+            <p>Não é necessário conectar carteira, criar conta ou informar qualquer segredo.</p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>Nós lemos os fatos</h3>
+            <p>Consultamos a blockchain e identificamos status, método, movimentações e taxas.</p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>Você entende</h3>
+            <p>O resultado vira uma explicação curta, acompanhada de alertas e próximos passos.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>Tx Raio-X · Beta</span>
+      <span class="footer-links">
+        <a href="privacidade.html">Privacidade</a>
+        <a href="termos.html">Termos do beta</a>
+      </span>
+    </footer>
+
+    <dialog class="paywall-dialog" id="paywall-dialog" aria-labelledby="paywall-title">
+      <button class="dialog-close" id="dialog-close" type="button" aria-label="Fechar">×</button>
+      <div class="dialog-icon" aria-hidden="true">0</div>
+      <p class="section-label">Você usou suas análises grátis</p>
+      <h2 id="paywall-title">Continue investigando por R$ 4,99.</h2>
+      <p>Desbloqueie análises ilimitadas neste navegador enquanto esta versão beta estiver disponível.</p>
+      <ul>
+        <li>Pagamento único</li>
+        <li>Até <span data-wallet-premium-limit>10</span> transações por busca de carteira</li>
+        <li>Sem assinatura escondida</li>
+        <li>Sem conectar sua carteira</li>
+      </ul>
+      <p class="local-access-note">
+        O acesso é salvo localmente. Limpar os dados do navegador, trocar de navegador ou de aparelho pode removê-lo.
+      </p>
+      <button class="primary-button dialog-primary" id="dialog-unlock-button" type="button">
+        Desbloquear beta por R$ 4,99
+      </button>
+      <small class="dialog-payment-note">Pagamento único · sem assinatura</small>
+      <button class="dialog-later" id="dialog-later" type="button">Agora não</button>
+    </dialog>
+
+    <!-- [UI] Um único diálogo reutilizável explica qualquer campo sem duplicar conteúdo estrutural. -->
+    <dialog
+      class="help-dialog"
+      id="field-help-dialog"
+      aria-labelledby="field-help-title"
+      aria-describedby="field-help-text"
+    >
+      <button class="dialog-close" id="field-help-close" type="button" aria-label="Fechar explicação">×</button>
+      <p class="section-label">Entenda este dado</p>
+      <h2 id="field-help-title"></h2>
+      <p id="field-help-text"></p>
+      <button class="secondary-button help-dialog-action" id="field-help-confirm" type="button">
+        Entendi
+      </button>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="js/app.mjs"></script>
+  </body>
+</html>
