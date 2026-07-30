@@ -8,7 +8,7 @@ PWA brasileira que traduz transacoes cripto em explicacoes claras e acionaveis
 
 ## Objetivo
 
-Permitir duas analises gratuitas por navegador/perfil e origem, e desbloqueio beta por R$ 4,99, sem custodia ou movimentacao de ativos
+Permitir duas analises gratuitas por navegador/perfil e origem e vender pacotes de 10 analises por R$ 4,90, sem assinatura, custodia ou movimentacao de ativos
 
 ## Publico Alvo
 
@@ -78,8 +78,10 @@ git diff --check
 
 - Nome de trabalho: Tx Raio-X.
 - Duas analises reais gratuitas por navegador/perfil e origem; no MVP, limpar ou trocar o navegador reinicia deliberadamente esse limite anonimo.
-- Em localhost e enderecos de loopback, o modo de demonstracao aplica o limite real de duas analises e permite simular o desbloqueio beta sem pagamento.
-- Desbloqueio beta: pagamento unico de R$ 4,99.
+- Em localhost e enderecos de loopback, o modo de demonstracao aplica o limite real de duas analises e permite simular a compra de 10 creditos sem pagamento.
+- Modelo de cobranca: duas analises gratis e pacotes cumulativos de 10 analises por R$ 4,90, sem assinatura ou renovacao automatica.
+- A analise concluida e a metrica de valor cobrada; buscas de carteira continuam gratuitas.
+- Direitos legados do antigo beta ilimitado sao preservados, mas nao sao mais vendidos.
 - Paywall inicial deliberadamente simples, salvo no dispositivo.
 - Sem login, custodia, conexao de carteira ou recomendacao financeira.
 - Redes iniciais: Ethereum, Base, Arbitrum, Polygon e BNB Chain.
@@ -92,7 +94,7 @@ git diff --check
 - Pagamento real depende da configuracao de um link em `js/config.mjs`.
 - A busca por endereco publico nao consome analise gratis; apenas a analise do hash escolhido consome.
 - Historico inicial usa instancias publicas do Blockscout para Ethereum, Base, Arbitrum e Polygon.
-- A busca por carteira exige uma rede especifica: retorna as 3 transacoes normais mais recentes no acesso gratuito e ate 10 no beta desbloqueado; o usuario pode inverter a ordem exibida.
+- A busca por carteira exige uma rede especifica: retorna as 3 transacoes normais mais recentes no acesso gratuito e ate 10 depois da primeira compra; o usuario pode inverter a ordem exibida.
 - Enquanto o entitlement estiver no localStorage, a regra 3/10 e segmentacao comercial experimental, nao controle antifraude.
 - A busca por endereco lista transacoes normais indexadas e nao deve ser apresentada como historico contabil completo.
 - A busca por carteira permanece em um painel recolhivel abaixo do analisador por hash.
@@ -100,3 +102,5 @@ git diff --check
 - Direcao de pagamento escolhida para producao: Mercado Pago Checkout Pro com Pix, mantendo validacao server-side.
 - A evolucao pos-validacao esta registrada em `ROADMAP.md`: conta recuperavel com Login com Google e alternativa de e-mail/senha.
 - O direito de acesso pago devera migrar do `localStorage` para um entitlement validado e persistido no servidor.
+- A estrategia comercial, hipoteses e criterios do experimento estao em `docs/MONETIZATION_STRATEGY.md`.
+- Mudancas futuras de preco, pacote, paywall ou checkout devem usar a skill local `tx-raio-x-monetization`.

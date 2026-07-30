@@ -1,0 +1,4 @@
+interface:
+  display_name: "Monetização Tx Raio-X"
+  short_description: "Projeta e valida a cobrança do Tx Raio-X"
+  default_prompt: "Use $tx-raio-x-monetization para revisar a oferta paga e propor um experimento mensurável."

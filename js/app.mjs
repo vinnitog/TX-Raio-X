@@ -1,6 +1,7 @@
 import {
-  BETA_PRICE,
   CHECKOUT_URL,
+  CREDIT_PACK_PRICE,
+  CREDIT_PACK_SIZE,
   FREE_ANALYSES,
   FREE_WALLET_HISTORY_LIMIT,
   isLocalTestEnvironment,
@@ -15,11 +16,13 @@ import {
   sortTransactions
 } from "./history-client.mjs";
 import {
+  addCredits,
+  applyCreditGrant,
   consumeAnalysis,
+  getFreeRemaining,
   getHistoryLimit,
   getRemaining,
-  readUsage,
-  unlockBeta
+  readUsage
 } from "./usage.mjs";
 
 const COPYABLE_DETAIL_LABELS = Object.freeze(["De", "Para", "Hash completo"]);
@@ -82,7 +85,11 @@ const elements = {
   walletResultsNote: document.querySelector("#wallet-results-note"),
   transactionList: document.querySelector("#transaction-list"),
   usageText: document.querySelector("#usage-text"),
+  creditPackSizeLabels: document.querySelectorAll("[data-credit-pack-size]"),
+  creditPackPriceLabels: document.querySelectorAll("[data-credit-pack-price]"),
+  creditUnitPriceLabels: document.querySelectorAll("[data-credit-unit-price]"),
   walletPremiumLimitLabels: document.querySelectorAll("[data-wallet-premium-limit]"),
+  priceSection: document.querySelector(".price-section"),
   resultSection: document.querySelector("#result-section"),
   resultKicker: document.querySelector("#result-kicker"),
   resultTitle: document.querySelector("#result-title"),
@@ -118,10 +125,16 @@ const IS_LOCAL_DEMO = isLocalTestEnvironment(window.location.hostname);
 
 function updateUsageLabel() {
   const usage = readUsage(localStorage);
-  const remaining = getRemaining(usage, FREE_ANALYSES);
-  elements.usageText.textContent = usage.unlocked
-    ? "Beta desbloqueado"
-    : `${remaining} ${remaining === 1 ? "análise grátis" : "análises grátis"}`;
+  const freeRemaining = getFreeRemaining(usage, FREE_ANALYSES);
+  if (usage.unlocked) {
+    elements.usageText.textContent = "Acesso legado ilimitado";
+  } else if (freeRemaining > 0) {
+    elements.usageText.textContent = `${freeRemaining} ${freeRemaining === 1 ? "análise grátis" : "análises grátis"}`;
+  } else if (usage.credits > 0) {
+    elements.usageText.textContent = `${usage.credits} ${usage.credits === 1 ? "análise disponível" : "análises disponíveis"}`;
+  } else {
+    elements.usageText.textContent = "Análises extras esgotadas";
+  }
 }
 
 function getWalletHistoryLimit() {
@@ -133,9 +146,9 @@ function getWalletHistoryLimit() {
 }
 
 function updateWalletLimitLabel() {
-  const unlocked = readUsage(localStorage).unlocked;
-  elements.walletLimitLabel.textContent = unlocked
-    ? `Até ${UNLOCKED_WALLET_HISTORY_LIMIT} transações no beta`
+  const hasPaidAccess = readUsage(localStorage).paid;
+  elements.walletLimitLabel.textContent = hasPaidAccess
+    ? `Até ${UNLOCKED_WALLET_HISTORY_LIMIT} transações no acesso pago`
     : `Últimas ${FREE_WALLET_HISTORY_LIMIT} no acesso grátis`;
 }
 
@@ -143,6 +156,21 @@ function updateConfiguredCopy() {
   for (const label of elements.walletPremiumLimitLabels) {
     label.textContent = String(UNLOCKED_WALLET_HISTORY_LIMIT);
   }
+  for (const label of elements.creditPackSizeLabels) {
+    label.textContent = String(CREDIT_PACK_SIZE);
+  }
+  for (const label of elements.creditPackPriceLabels) {
+    label.textContent = CREDIT_PACK_PRICE.toFixed(2).replace(".", ",");
+  }
+  for (const label of elements.creditUnitPriceLabels) {
+    label.textContent = (CREDIT_PACK_PRICE / CREDIT_PACK_SIZE)
+      .toFixed(2)
+      .replace(".", ",");
+  }
+}
+
+function updatePurchaseAvailability() {
+  elements.priceSection.hidden = readUsage(localStorage).unlocked;
 }
 
 function showToast(message) {
@@ -247,9 +275,9 @@ function formatTransactionDate(timestamp) {
 function getAnalyzeActionLabel() {
   const usage = readUsage(localStorage);
   if (usage.unlocked) return "Analisar";
-  return getRemaining(usage, FREE_ANALYSES) > 0
-    ? "Analisar · usa 1 grátis"
-    : "Analisar · requer desbloqueio";
+  if (getFreeRemaining(usage, FREE_ANALYSES) > 0) return "Analisar · usa 1 grátis";
+  if (usage.credits > 0) return "Analisar · usa 1 análise extra";
+  return "Analisar · requer análises extras";
 }
 
 function renderWalletHistory({
@@ -475,7 +503,7 @@ function openPaywall() {
   if (typeof elements.paywall.showModal === "function") {
     elements.paywall.showModal();
   } else {
-    showToast(`O beta custa R$ ${BETA_PRICE.toFixed(2).replace(".", ",")}.`);
+    showToast(`O pacote custa R$ ${CREDIT_PACK_PRICE.toFixed(2).replace(".", ",")}.`);
   }
 }
 
@@ -496,7 +524,7 @@ async function runAnalysis(hash, networkId, setPending, showError) {
     const result = analyzeTransaction(rawTransaction);
     showResult(result);
     try {
-      consumeAnalysis(localStorage);
+      consumeAnalysis(localStorage, FREE_ANALYSES);
       updateUsageLabel();
     } catch {
       showToast("A análise foi concluída, mas este navegador bloqueou o salvamento do limite.");
@@ -511,11 +539,16 @@ async function runAnalysis(hash, networkId, setPending, showError) {
   }
 }
 
-function activateBetaAccess(message) {
+function activateCreditPack(message, grantId = null) {
+  let wasApplied = true;
   try {
-    unlockBeta(localStorage);
+    if (grantId) {
+      ({ applied: wasApplied } = applyCreditGrant(localStorage, grantId, CREDIT_PACK_SIZE));
+    } else {
+      addCredits(localStorage, CREDIT_PACK_SIZE);
+    }
   } catch {
-    showToast("Não foi possível salvar o desbloqueio neste navegador.");
+    showToast("Não foi possível salvar as análises neste navegador.");
     return false;
   }
 
@@ -525,13 +558,18 @@ function activateBetaAccess(message) {
   currentWalletHistory = null;
   elements.walletResults.hidden = true;
   elements.transactionList.replaceChildren();
-  showToast(message);
+  showToast(wasApplied ? message : "Este pagamento já adicionou as análises.");
   return true;
 }
 
 function beginCheckout() {
+  if (readUsage(localStorage).unlocked) {
+    showToast("Seu acesso legado já é ilimitado.");
+    return;
+  }
+
   if (IS_LOCAL_DEMO) {
-    activateBetaAccess("Beta desbloqueado · simulação local, sem pagamento.");
+    activateCreditPack(`${CREDIT_PACK_SIZE} análises adicionadas · simulação local, sem pagamento.`);
     return;
   }
 
@@ -572,8 +610,9 @@ async function applyPaymentReturn() {
       return;
     }
 
-    const activated = activateBetaAccess(
-      `Beta desbloqueado. Busque novamente para ver até ${UNLOCKED_WALLET_HISTORY_LIMIT} transações.`
+    const activated = activateCreditPack(
+      `${CREDIT_PACK_SIZE} análises adicionadas. Busque novamente para ver até ${UNLOCKED_WALLET_HISTORY_LIMIT} transações.`,
+      paymentId
     );
     if (!activated) return;
 
@@ -716,3 +755,4 @@ applyPaymentReturn();
 updateConfiguredCopy();
 updateUsageLabel();
 updateWalletLimitLabel();
+updatePurchaseAvailability();

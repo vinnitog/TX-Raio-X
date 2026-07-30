@@ -33,3 +33,11 @@ test("every network has RPC endpoints and Ethereum has a tested fallback", async
     "https://ethereum-rpc.publicnode.com"
   ]);
 });
+
+test("the active offer is configured as one pack below five reais", async () => {
+  const { CREDIT_PACK_PRICE, CREDIT_PACK_SIZE, FREE_ANALYSES } = await import("../js/config.mjs");
+
+  assert.equal(FREE_ANALYSES, 2);
+  assert.equal(CREDIT_PACK_SIZE, 10);
+  assert.equal(CREDIT_PACK_PRICE, 4.9);
+});
