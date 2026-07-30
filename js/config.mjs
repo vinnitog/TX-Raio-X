@@ -1,5 +1,6 @@
 export const FREE_ANALYSES = 2;
-export const BETA_PRICE = 4.99;
+export const CREDIT_PACK_PRICE = 4.90;
+export const CREDIT_PACK_SIZE = 10;
 export const FREE_WALLET_HISTORY_LIMIT = 3;
 export const UNLOCKED_WALLET_HISTORY_LIMIT = 10;
 

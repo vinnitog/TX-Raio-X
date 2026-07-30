@@ -3,22 +3,23 @@
 ## Agora: validar o produto
 
 - Duas análises gratuitas por navegador.
-- Desbloqueio beta de R$ 4,99.
+- Pacote cumulativo de 10 análises por R$ 4,90, sem assinatura.
 - Busca pública por hash ou endereço EVM.
 - Sem login, custódia ou conexão de carteira.
+- Medir o funil definido em `docs/MONETIZATION_STRATEGY.md`.
 
 ## Próxima etapa: conta recuperável e acesso durável
 
 ### Problema
 
-O desbloqueio atual é salvo no `localStorage`. Usuários de cripto costumam limpar
+O saldo atual é salvo no `localStorage`. Usuários de cripto costumam limpar
 histórico, cookies e dados do navegador com frequência. Perder o acesso pago ao
 trocar de navegador, aparelho ou limpar dados reduz confiança e conversão.
 
 ### Experiência desejada
 
 - Manter as duas análises gratuitas sem exigir cadastro.
-- Pedir uma conta somente quando o usuário decidir desbloquear o beta.
+- Pedir uma conta somente quando o usuário decidir comprar um pacote.
 - Oferecer dois caminhos:
   1. **Continuar com Google** para contas Google/Gmail, usando OAuth/OpenID Connect.
   2. **Cadastrar outro e-mail** com formulário simples de e-mail e senha.
@@ -79,20 +80,18 @@ trocar de navegador, aparelho ou limpar dados reduz confiança e conversão.
 - Recuperação de senha e verificação de e-mail funcionam sem intervenção manual.
 - Exclusão de conta e dados respeita o prazo de retenção informado.
 
-## Experimento: usos extras e progressão
+## Experimento posterior: progressão
 
 Na interface, chamar a unidade de **uso** ou **análise extra**. O termo técnico
 `crédito` pode continuar apenas no backend.
 
-### Hipótese de oferta
+### Oferta atual
 
 - Duas análises gratuitas para experimentar.
-- Pacote de 3 usos por R$ 4,90 como primeira compra de baixo atrito.
-- Beta ilimitado por R$ 14,90 como opção de maior valor.
-- Manter R$ 4,99 como preço fundador até existir validação real; testar os novos
-  valores antes de substituir a oferta atual.
-- O ilimitado cobre o motor determinístico atual. Recursos futuros com custo
-  variável, como IA remota, podem ter franquia própria.
+- Pacote único de 10 usos por R$ 4,90 como primeira compra de baixo atrito.
+- Não vender ilimitado enquanto recursos futuros puderem gerar custo variável.
+- Depois de 10 compradores, testar 25 usos por R$ 9,90 em coortes separadas,
+  sem adicionar vários planos à página inicial.
 
 ### Gamificação responsável
 
@@ -106,10 +105,9 @@ Na interface, chamar a unidade de **uso** ou **análise extra**. O termo técnic
 
 ### Critérios para validar
 
-- Definir antes do experimento metas numéricas para conversão, canibalização do
-  ilimitado, custo por uso concedido e fraude.
-- A compra barata aumenta conversão sem reduzir excessivamente a escolha do
-  ilimitado.
+- Definir antes do experimento metas numéricas para conversão, recompra, custo
+  por uso concedido e fraude.
+- A compra barata converte sem tornar negativa a margem do pacote.
 - A missão ensina algo útil e aumenta a segunda análise, não apenas cliques.
 - Custo por uso concedido e abuso permanecem pequenos.
 - Preços e recompensas podem ser alterados por configuração, sem nova versão do

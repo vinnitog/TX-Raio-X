@@ -223,18 +223,19 @@
         </article>
       </section>
 
+      <!-- [UI] Uma única oferta reduz escolha e deixa quantidade, preço e renovação explícitos. -->
       <section class="price-section" aria-labelledby="price-title">
         <div>
-          <p class="section-label">Beta fundador</p>
-          <h2 id="price-title">Teste duas vezes. Gostou? É menos que um cafezinho.</h2>
-          <p>Um único pagamento libera análises ilimitadas neste navegador enquanto o beta estiver disponível.</p>
+          <p class="section-label">Pacote inicial</p>
+          <h2 id="price-title">Continue quando precisar. Sem assinatura.</h2>
+          <p>Depois das duas análises grátis, compre apenas o que for usar. As análises do pacote não expiram durante o beta.</p>
         </div>
         <div class="price-card">
-          <span>Desbloqueio beta</span>
-          <strong><small>R$</small> 4,99</strong>
-          <span class="price-benefit">Análises ilimitadas · até <span data-wallet-premium-limit>10</span> transações por busca</span>
-          <button class="primary-button" id="price-unlock-button" type="button">Desbloquear por R$ 4,99</button>
-          <small>Pagamento único · sem assinatura · acesso local</small>
+          <span><span data-credit-pack-size>10</span> análises completas</span>
+          <strong><small>R$</small> <span data-credit-pack-price>4,90</span></strong>
+          <span class="price-benefit">R$ <span data-credit-unit-price>0,49</span> por Raio-X · até <span data-wallet-premium-limit>10</span> transações por busca</span>
+          <button class="primary-button" id="price-unlock-button" type="button">Comprar <span data-credit-pack-size>10</span> análises</button>
+          <small>Pagamento único · sem renovação automática · acesso local</small>
         </div>
       </section>
 
@@ -272,22 +273,22 @@
     <dialog class="paywall-dialog" id="paywall-dialog" aria-labelledby="paywall-title">
       <button class="dialog-close" id="dialog-close" type="button" aria-label="Fechar">×</button>
       <div class="dialog-icon" aria-hidden="true">0</div>
-      <p class="section-label">Você usou suas análises grátis</p>
-      <h2 id="paywall-title">Continue investigando por R$ 4,99.</h2>
-      <p>Desbloqueie análises ilimitadas neste navegador enquanto esta versão beta estiver disponível.</p>
+      <p class="section-label">Suas análises grátis acabaram</p>
+      <h2 id="paywall-title">Leve <span data-credit-pack-size>10</span> novos Raio-X por R$ <span data-credit-pack-price>4,90</span>.</h2>
+      <p>Compre um pacote simples, use quando precisar e volte a carregar apenas quando as análises terminarem.</p>
       <ul>
-        <li>Pagamento único</li>
+        <li><span data-credit-pack-size>10</span> análises completas</li>
         <li>Até <span data-wallet-premium-limit>10</span> transações por busca de carteira</li>
-        <li>Sem assinatura escondida</li>
+        <li>Sem assinatura ou renovação automática</li>
         <li>Sem conectar sua carteira</li>
       </ul>
       <p class="local-access-note">
         O acesso é salvo localmente. Limpar os dados do navegador, trocar de navegador ou de aparelho pode removê-lo.
       </p>
       <button class="primary-button dialog-primary" id="dialog-unlock-button" type="button">
-        Desbloquear beta por R$ 4,99
+        Comprar <span data-credit-pack-size>10</span> análises · R$ <span data-credit-pack-price>4,90</span>
       </button>
-      <small class="dialog-payment-note">Pagamento único · sem assinatura</small>
+      <small class="dialog-payment-note">Pagamento único · análises sem validade durante o beta</small>
       <button class="dialog-later" id="dialog-later" type="button">Agora não</button>
     </dialog>
 

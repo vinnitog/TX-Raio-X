@@ -55,7 +55,7 @@ test("the installable entry point links the manifest and registers the service w
 test("service worker uses a versioned cache and includes wallet history code", () => {
   const serviceWorker = read("sw.js");
 
-  assert.match(serviceWorker, /const CACHE_NAME = ["']tx-raio-x-v34["'];/);
+  assert.match(serviceWorker, /const CACHE_NAME = ["']tx-raio-x-v36["'];/);
   assert.ok(
     appShellEntries().includes("./js/history-client.mjs"),
     "wallet history client should be cached for offline app startup"
@@ -150,14 +150,15 @@ test("wallet history requires one network and offers a custom ordering control",
   assert.match(app, /walletPremiumLimitLabels/);
 });
 
-test("local demo enforces free usage and simulates beta unlock without payment", () => {
+test("local demo enforces free usage and simulates a credit purchase without payment", () => {
+  const index = read("index.html");
   const app = read("js/app.mjs");
   const runAnalysis = app.slice(
     app.indexOf("async function runAnalysis("),
-    app.indexOf("function activateBetaAccess(")
+    app.indexOf("function activateCreditPack(")
   );
-  const activateBetaAccess = app.slice(
-    app.indexOf("function activateBetaAccess("),
+  const activateCreditPack = app.slice(
+    app.indexOf("function activateCreditPack("),
     app.indexOf("function beginCheckout(")
   );
   const beginCheckout = app.slice(
@@ -188,34 +189,39 @@ test("local demo enforces free usage and simulates beta unlock without payment",
     /demoButton\.addEventListener\("click", \(\) => showResult\(createDemoAnalysis\(\), true\)\)/
   );
   assert.doesNotMatch(walletSearchHandler, /consumeAnalysis/);
-  assert.match(activateBetaAccess, /unlockBeta\(localStorage\)/);
-  assert.match(activateBetaAccess, /updateUsageLabel\(\)/);
-  assert.match(activateBetaAccess, /updateWalletLimitLabel\(\)/);
+  assert.match(activateCreditPack, /addCredits\(localStorage,\s*CREDIT_PACK_SIZE\)/);
+  assert.match(activateCreditPack, /updateUsageLabel\(\)/);
+  assert.match(activateCreditPack, /updateWalletLimitLabel\(\)/);
   assert.match(
-    activateBetaAccess,
+    activateCreditPack,
     /catch \{[\s\S]*?return false;[\s\S]*?return true;/
   );
-  assert.match(beginCheckout, /if \(IS_LOCAL_DEMO\)[\s\S]*?activateBetaAccess\([\s\S]*?return;/);
+  assert.match(beginCheckout, /if \(IS_LOCAL_DEMO\)[\s\S]*?activateCreditPack\([\s\S]*?return;/);
   assert.match(beginCheckout, /if \(!CHECKOUT_URL\)[\s\S]*?window\.location\.assign\(CHECKOUT_URL\)/);
-  assert.doesNotMatch(localPaymentBranch, /activateBetaAccess|unlockBeta/);
+  assert.doesNotMatch(localPaymentBranch, /activateCreditPack|addCredits/);
   assert.doesNotMatch(app, /priceSection\.hidden = true/);
   assert.match(app, /getRemaining\(usage,\s*FREE_ANALYSES\)/);
   assert.doesNotMatch(app, /getRemaining\(usage,\s*FREE_ANALYSES,\s*IS_LOCAL/);
-  assert.match(app, /consumeAnalysis\(localStorage\)/);
+  assert.match(app, /consumeAnalysis\(localStorage,\s*FREE_ANALYSES\)/);
   assert.doesNotMatch(app, /consumeAnalysis\(localStorage,\s*IS_LOCAL/);
   assert.match(
     app,
-    /if \(IS_LOCAL_DEMO\) \{[\s\S]*?activateBetaAccess\("Beta desbloqueado · simulação local, sem pagamento\."\);[\s\S]*?return;/
+    /if \(IS_LOCAL_DEMO\) \{[\s\S]*?activateCreditPack\(`\$\{CREDIT_PACK_SIZE\} análises adicionadas · simulação local, sem pagamento\.`\);[\s\S]*?return;/
   );
-  assert.match(app, /function activateBetaAccess\(message\)[\s\S]*?unlockBeta\(localStorage\)/);
+  assert.match(app, /function activateCreditPack\(message,\s*grantId = null\)[\s\S]*?addCredits\(localStorage,\s*CREDIT_PACK_SIZE\)/);
   assert.match(
     app,
-    /function activateBetaAccess\(message\)[\s\S]*?catch \{[\s\S]*?return false;[\s\S]*?return true;/
+    /function activateCreditPack\(message,\s*grantId = null\)[\s\S]*?catch \{[\s\S]*?return false;[\s\S]*?return true;/
   );
   assert.match(
     app,
-    /const activated = activateBetaAccess\([\s\S]*?if \(!activated\) return;[\s\S]*?searchParams\.delete\("payment_id"\)/
+    /const activated = activateCreditPack\([\s\S]*?paymentId[\s\S]*?if \(!activated\) return;[\s\S]*?searchParams\.delete\("payment_id"\)/
   );
+  assert.match(app, /applyCreditGrant\(localStorage,\s*grantId,\s*CREDIT_PACK_SIZE\)/);
+  assert.match(app, /if \(readUsage\(localStorage\)\.unlocked\)[\s\S]*?return;/);
+  assert.match(app, /priceSection\.hidden = readUsage\(localStorage\)\.unlocked/);
+  assert.match(app, /CREDIT_PACK_PRICE \/ CREDIT_PACK_SIZE/);
+  assert.match(index, /data-credit-unit-price/);
   assert.match(
     app,
     /if \(IS_LOCAL_DEMO\) \{[\s\S]*?url\.searchParams\.delete\("payment_id"\);[\s\S]*?return;/

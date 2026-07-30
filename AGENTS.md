@@ -32,6 +32,18 @@ React/Vite: valido se surgirem muitas telas/estado. Electron: rejeitado; PWA dev
 
 Antes da primeira feature real, o `senior-dev` deve confirmar se essa stack ainda faz sentido para o objetivo do projeto.
 
+## Skill De Monetizacao
+
+Para qualquer alteracao de preco, gratuidade, creditos, paywall, checkout,
+beneficios pagos ou experimento comercial, usar primeiro:
+
+```text
+.agents/skills/tx-raio-x-monetization/SKILL.md
+```
+
+Registrar a decisao e os criterios do teste em `docs/MONETIZATION_STRATEGY.md`
+antes de alterar a interface ou a regra de uso.
+
 ## Fluxo Obrigatorio De Desenvolvimento
 
 Toda mudanca de desenvolvimento deve seguir esta ordem:
