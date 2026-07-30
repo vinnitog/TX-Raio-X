@@ -1,0 +1,9 @@
+{
+  "name": "tx-raio-x",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PWA que traduz transações EVM para português claro.",
+  "scripts": {
+    "test": "node --test unit/*.test.js"
+  }
+}
