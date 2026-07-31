@@ -1,4 +1,5 @@
-const CHECKOUT_ATTEMPT_KEY = "txraiox_checkout_attempt_v1";
+const LEGACY_CHECKOUT_ATTEMPT_KEY = "txraiox_checkout_attempt_v1";
+const CHECKOUT_ATTEMPTS_KEY = "txraiox_checkout_attempts_v2";
 const PACKAGE_CODE = "analysis_pack_10";
 const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TEST_CHECKOUT_HOSTS = new Set([
@@ -13,24 +14,59 @@ export class CheckoutClientError extends Error {
   }
 }
 
-function readAttempt(storage, userId) {
+function isValidAttempt(attempt) {
+  return typeof attempt?.userId === "string"
+    && attempt.userId
+    && UUID_V4_PATTERN.test(attempt?.idempotencyKey ?? "");
+}
+
+function readAttempts(storage) {
   try {
-    const saved = JSON.parse(storage?.getItem(CHECKOUT_ATTEMPT_KEY) ?? "null");
-    if (saved?.userId === userId && UUID_V4_PATTERN.test(saved?.idempotencyKey ?? "")) {
-      return saved.idempotencyKey;
+    const saved = JSON.parse(storage?.getItem(CHECKOUT_ATTEMPTS_KEY) ?? "[]");
+    if (!Array.isArray(saved)) return [];
+    const byUser = new Map();
+    for (const attempt of saved.filter(isValidAttempt)) {
+      byUser.delete(attempt.userId);
+      byUser.set(attempt.userId, attempt);
     }
+    return [...byUser.values()];
   } catch {
-    // A tentativa continua em memória quando o navegador bloqueia sessionStorage.
+    return [];
   }
-  return null;
 }
 
 function writeAttempt(storage, userId, idempotencyKey) {
   try {
-    storage?.setItem(CHECKOUT_ATTEMPT_KEY, JSON.stringify({ userId, idempotencyKey }));
+    const attempts = readAttempts(storage).filter((attempt) => attempt.userId !== userId);
+    attempts.push({ userId, idempotencyKey });
+    storage?.setItem(CHECKOUT_ATTEMPTS_KEY, JSON.stringify(attempts));
+    return true;
   } catch {
     // A criação do checkout não depende da disponibilidade do armazenamento local.
+    return false;
   }
+}
+
+function readAttempt(storage, userId) {
+  const saved = readAttempts(storage).find((attempt) => attempt.userId === userId);
+  if (saved) return saved.idempotencyKey;
+
+  try {
+    const legacy = JSON.parse(storage?.getItem(LEGACY_CHECKOUT_ATTEMPT_KEY) ?? "null");
+    if (legacy?.userId === userId && isValidAttempt(legacy)) {
+      if (writeAttempt(storage, userId, legacy.idempotencyKey)) {
+        try {
+          storage?.removeItem?.(LEGACY_CHECKOUT_ATTEMPT_KEY);
+        } catch {
+          // A cópia v2 já preserva a tentativa mesmo se a limpeza falhar.
+        }
+      }
+      return legacy.idempotencyKey;
+    }
+  } catch {
+    // A tentativa continua em memória quando o navegador bloqueia o armazenamento.
+  }
+  return null;
 }
 
 async function getFunctionErrorCode(error) {
@@ -66,7 +102,7 @@ export function createCheckoutClient(client, {
   storage = globalThis.localStorage,
   createId = () => globalThis.crypto.randomUUID()
 } = {}) {
-  let memoryAttempt = null;
+  const memoryAttempts = new Map();
 
   return Object.freeze({
     async start() {
@@ -76,17 +112,15 @@ export function createCheckoutClient(client, {
 
       const userId = session.user.id;
       let idempotencyKey = readAttempt(storage, userId);
-      if (!idempotencyKey && memoryAttempt?.userId === userId) {
-        idempotencyKey = memoryAttempt.idempotencyKey;
-      }
+      if (!idempotencyKey) idempotencyKey = memoryAttempts.get(userId) ?? null;
       if (!idempotencyKey) {
         idempotencyKey = createId();
         if (!UUID_V4_PATTERN.test(idempotencyKey)) {
           throw new CheckoutClientError("idempotency_unavailable");
         }
-        memoryAttempt = { userId, idempotencyKey };
-        writeAttempt(storage, userId, idempotencyKey);
       }
+      memoryAttempts.set(userId, idempotencyKey);
+      writeAttempt(storage, userId, idempotencyKey);
 
       const { data, error } = await client.functions.invoke("checkout", {
         body: { packageCode: PACKAGE_CODE },

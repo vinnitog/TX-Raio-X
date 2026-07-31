@@ -3,7 +3,12 @@ const assert = require("node:assert/strict");
 
 const idOne = "018e2f16-2e2a-4b88-a231-2bda2696f741";
 const idTwo = "15c946b8-6403-4fb4-848f-2f064936d9d8";
-const idThree = "28aa9940-55ea-49a7-84a3-4509f8998877";
+const legacyKey = "txraiox_checkout_attempt_v1";
+const attemptsKey = "txraiox_checkout_attempts_v2";
+
+function uuidFor(index) {
+  return `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`;
+}
 
 function createStorage({ blocked = false } = {}) {
   const values = new Map();
@@ -114,6 +119,156 @@ test("failed retries reuse the same key for the same account", async () => {
   );
 });
 
+test("a valid v1 attempt migrates to v2 and is reused", async () => {
+  const { createCheckoutClient } = await import("../js/checkout-client.mjs");
+  const storage = createStorage();
+  storage.values.set(legacyKey, JSON.stringify({ userId: "user-1", idempotencyKey: idOne }));
+  const supabase = createSupabase();
+
+  await createCheckoutClient(supabase.client, {
+    storage,
+    createId: () => assert.fail("valid v1 must be reused")
+  }).start();
+
+  assert.equal(supabase.calls[0].options.headers["Idempotency-Key"], idOne);
+  assert.deepEqual(JSON.parse(storage.values.get(attemptsKey)), [
+    { userId: "user-1", idempotencyKey: idOne }
+  ]);
+  assert.equal(storage.values.has(legacyKey), false, "v1 must be removed after the v2 copy succeeds");
+});
+
+test("failed v1 cleanup keeps the migrated key unchanged", async () => {
+  const { createCheckoutClient } = await import("../js/checkout-client.mjs");
+  const storage = createStorage();
+  storage.values.set(legacyKey, JSON.stringify({ userId: "user-1", idempotencyKey: idOne }));
+  storage.removeItem = () => { throw new Error("cleanup blocked"); };
+  const supabase = createSupabase();
+  const client = createCheckoutClient(supabase.client, {
+    storage,
+    createId: () => assert.fail("cleanup failure must not replace the migrated key")
+  });
+
+  await client.start();
+  await client.start();
+  assert.deepEqual(
+    supabase.calls.map(({ options }) => options.headers["Idempotency-Key"]),
+    [idOne, idOne]
+  );
+  assert.equal(storage.values.has(legacyKey), true);
+  assert.deepEqual(JSON.parse(storage.values.get(attemptsKey)), [
+    { userId: "user-1", idempotencyKey: idOne }
+  ]);
+});
+
+test("v1 is not removed when the v2 write fails", async () => {
+  const { createCheckoutClient } = await import("../js/checkout-client.mjs");
+  const storage = createStorage();
+  let removeCalls = 0;
+  storage.values.set(legacyKey, JSON.stringify({ userId: "user-1", idempotencyKey: idOne }));
+  storage.setItem = () => { throw new Error("write blocked"); };
+  storage.removeItem = () => { removeCalls += 1; };
+  const supabase = createSupabase();
+
+  await createCheckoutClient(supabase.client, {
+    storage,
+    createId: () => assert.fail("valid v1 must still be used")
+  }).start();
+  assert.equal(supabase.calls[0].options.headers["Idempotency-Key"], idOne);
+  assert.equal(removeCalls, 0);
+  assert.equal(storage.values.has(legacyKey), true);
+});
+
+test("v1 for A does not leak to B and remains recoverable when A returns", async () => {
+  const { createCheckoutClient } = await import("../js/checkout-client.mjs");
+  const storage = createStorage();
+  storage.values.set(legacyKey, JSON.stringify({ userId: "user-a", idempotencyKey: idOne }));
+  const accountB = createSupabase({ userId: "user-b" });
+  await createCheckoutClient(accountB.client, { storage, createId: () => idTwo }).start();
+  assert.equal(accountB.calls[0].options.headers["Idempotency-Key"], idTwo);
+
+  const accountA = createSupabase({ userId: "user-a" });
+  await createCheckoutClient(accountA.client, {
+    storage,
+    createId: () => assert.fail("A must recover its v1 attempt")
+  }).start();
+  assert.equal(accountA.calls[0].options.headers["Idempotency-Key"], idOne);
+  assert.deepEqual(JSON.parse(storage.values.get(attemptsKey)), [
+    { userId: "user-b", idempotencyKey: idTwo },
+    { userId: "user-a", idempotencyKey: idOne }
+  ]);
+});
+
+test("invalid or corrupted v1 data is ignored safely", async () => {
+  const { createCheckoutClient } = await import("../js/checkout-client.mjs");
+  for (const legacy of ["{broken", JSON.stringify({ userId: "user-1", idempotencyKey: "not-a-uuid" })]) {
+    const storage = createStorage();
+    storage.values.set(legacyKey, legacy);
+    const supabase = createSupabase();
+    await createCheckoutClient(supabase.client, { storage, createId: () => idTwo }).start();
+    assert.equal(supabase.calls[0].options.headers["Idempotency-Key"], idTwo);
+    assert.deepEqual(JSON.parse(storage.values.get(attemptsKey)), [
+      { userId: "user-1", idempotencyKey: idTwo }
+    ]);
+  }
+});
+
+test("partially invalid v2 data preserves valid attempts and drops invalid entries on write", async () => {
+  const { createCheckoutClient } = await import("../js/checkout-client.mjs");
+  const storage = createStorage();
+  storage.values.set(attemptsKey, JSON.stringify([
+    { userId: "user-a", idempotencyKey: idOne },
+    { userId: "", idempotencyKey: idTwo },
+    { userId: "user-invalid", idempotencyKey: "broken" },
+    { userId: "user-b", idempotencyKey: idTwo }
+  ]));
+  const accountA = createSupabase({ userId: "user-a" });
+  await createCheckoutClient(accountA.client, {
+    storage,
+    createId: () => assert.fail("valid A entry must survive")
+  }).start();
+  assert.equal(accountA.calls[0].options.headers["Idempotency-Key"], idOne);
+
+  const accountC = createSupabase({ userId: "user-c" });
+  await createCheckoutClient(accountC.client, { storage, createId: () => uuidFor(3) }).start();
+  assert.deepEqual(JSON.parse(storage.values.get(attemptsKey)), [
+    { userId: "user-b", idempotencyKey: idTwo },
+    { userId: "user-a", idempotencyKey: idOne },
+    { userId: "user-c", idempotencyKey: uuidFor(3) }
+  ]);
+});
+
+test("v2 takes precedence over v1 for the same account", async () => {
+  const { createCheckoutClient } = await import("../js/checkout-client.mjs");
+  const storage = createStorage();
+  storage.values.set(legacyKey, JSON.stringify({ userId: "user-1", idempotencyKey: idOne }));
+  storage.values.set(attemptsKey, JSON.stringify([{ userId: "user-1", idempotencyKey: idTwo }]));
+  const supabase = createSupabase();
+  await createCheckoutClient(supabase.client, {
+    storage,
+    createId: () => assert.fail("v2 must take precedence")
+  }).start();
+  assert.equal(supabase.calls[0].options.headers["Idempotency-Key"], idTwo);
+});
+
+test("the last valid duplicate v2 attempt wins", async () => {
+  const { createCheckoutClient } = await import("../js/checkout-client.mjs");
+  const storage = createStorage();
+  storage.values.set(attemptsKey, JSON.stringify([
+    { userId: "user-1", idempotencyKey: idOne },
+    { userId: "user-1", idempotencyKey: "invalid" },
+    { userId: "user-1", idempotencyKey: idTwo }
+  ]));
+  const supabase = createSupabase();
+  await createCheckoutClient(supabase.client, {
+    storage,
+    createId: () => assert.fail("last valid duplicate must be reused")
+  }).start();
+  assert.equal(supabase.calls[0].options.headers["Idempotency-Key"], idTwo);
+  assert.deepEqual(JSON.parse(storage.values.get(attemptsKey)), [
+    { userId: "user-1", idempotencyKey: idTwo }
+  ]);
+});
+
 test("a different authenticated account never inherits another user's retry key", async () => {
   const { createCheckoutClient } = await import("../js/checkout-client.mjs");
   const storage = createStorage();
@@ -130,7 +285,7 @@ test("a different authenticated account never inherits another user's retry key"
   assert.equal(second.calls[0].options.headers["Idempotency-Key"], idTwo);
 });
 
-test("audit reproduction: checkout A -> B -> A currently replaces A's unresolved key", async () => {
+test("checkout A -> B -> A preserves A's unresolved idempotency key", async () => {
   const { createCheckoutClient } = await import("../js/checkout-client.mjs");
   const storage = createStorage();
   const reject = async () => ({ data: null, error: new Error("offline") });
@@ -148,16 +303,13 @@ test("audit reproduction: checkout A -> B -> A currently replaces A's unresolved
   }).start());
   await assert.rejects(createCheckoutClient(accountASecond.client, {
     storage,
-    createId: () => idThree
+    createId: () => assert.fail("A must reuse its unresolved key")
   }).start());
 
   assert.equal(accountAFirst.calls[0].options.headers["Idempotency-Key"], idOne);
   assert.equal(accountB.calls[0].options.headers["Idempotency-Key"], idTwo);
-  assert.equal(accountASecond.calls[0].options.headers["Idempotency-Key"], idThree);
-  assert.notEqual(accountASecond.calls[0].options.headers["Idempotency-Key"], idOne);
+  assert.equal(accountASecond.calls[0].options.headers["Idempotency-Key"], idOne);
 });
-
-test.todo("checkout A -> B -> A preserves A's unresolved idempotency key");
 
 test("checkout rejects production or non-sandbox redirect responses", async () => {
   const { CheckoutClientError, createCheckoutClient } = await import("../js/checkout-client.mjs");
@@ -208,6 +360,97 @@ test("blocked sessionStorage still reuses an in-memory attempt", async () => {
   });
   await assert.rejects(client.start());
   await assert.rejects(client.start());
+  assert.deepEqual(
+    supabase.calls.map(({ options }) => options.headers["Idempotency-Key"]),
+    [idOne, idOne]
+  );
+});
+
+test("blocked storage preserves A -> B -> A attempts in one client instance", async () => {
+  const { createCheckoutClient } = await import("../js/checkout-client.mjs");
+  let currentUserId = "user-a";
+  const calls = [];
+  const client = createCheckoutClient({
+    auth: {
+      getSession: async () => ({
+        data: { session: { user: { id: currentUserId } } },
+        error: null
+      })
+    },
+    functions: {
+      invoke: async (_name, options) => {
+        calls.push({ userId: currentUserId, key: options.headers["Idempotency-Key"] });
+        return { data: null, error: new Error("offline") };
+      }
+    }
+  }, {
+    storage: createStorage({ blocked: true }),
+    createId: () => currentUserId === "user-a" ? idOne : idTwo
+  });
+
+  await assert.rejects(client.start());
+  currentUserId = "user-b";
+  await assert.rejects(client.start());
+  currentUserId = "user-a";
+  await assert.rejects(client.start());
+  assert.deepEqual(calls, [
+    { userId: "user-a", key: idOne },
+    { userId: "user-b", key: idTwo },
+    { userId: "user-a", key: idOne }
+  ]);
+});
+
+test("v2 storage does not silently evict unresolved account attempts", async () => {
+  const { createCheckoutClient } = await import("../js/checkout-client.mjs");
+  const storage = createStorage();
+  storage.values.set(attemptsKey, JSON.stringify(Array.from({ length: 10 }, (_, index) => ({
+    userId: `user-${index + 1}`,
+    idempotencyKey: uuidFor(index + 1)
+  }))));
+  const eleventh = createSupabase({ userId: "user-11" });
+  await createCheckoutClient(eleventh.client, {
+    storage,
+    createId: () => uuidFor(11)
+  }).start();
+
+  const attempts = JSON.parse(storage.values.get(attemptsKey));
+  assert.equal(attempts.length, 11);
+  assert.deepEqual(attempts.map(({ userId }) => userId), [
+    "user-1", "user-2", "user-3", "user-4", "user-5", "user-6",
+    "user-7", "user-8", "user-9", "user-10", "user-11"
+  ]);
+});
+
+test("an in-memory attempt is persisted when blocked storage recovers", async () => {
+  const { createCheckoutClient } = await import("../js/checkout-client.mjs");
+  const values = new Map();
+  let blocked = true;
+  const storage = {
+    getItem(key) {
+      if (blocked) throw new Error("blocked");
+      return values.get(key) ?? null;
+    },
+    setItem(key, value) {
+      if (blocked) throw new Error("blocked");
+      values.set(key, value);
+    },
+    removeItem(key) {
+      if (blocked) throw new Error("blocked");
+      values.delete(key);
+    }
+  };
+  const supabase = createSupabase({
+    invoke: async () => ({ data: null, error: new Error("offline") })
+  });
+  const client = createCheckoutClient(supabase.client, { storage, createId: () => idOne });
+  await assert.rejects(client.start());
+  assert.equal(values.has(attemptsKey), false);
+
+  blocked = false;
+  await assert.rejects(client.start());
+  assert.deepEqual(JSON.parse(values.get(attemptsKey)), [
+    { userId: "user-1", idempotencyKey: idOne }
+  ]);
   assert.deepEqual(
     supabase.calls.map(({ options }) => options.headers["Idempotency-Key"]),
     [idOne, idOne]

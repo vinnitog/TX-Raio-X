@@ -105,5 +105,8 @@ git diff --check
 - A migration inicial do Supabase para ordens, pagamentos e ledger foi aplicada no projeto de desenvolvimento com RLS, idempotencia e reversao integral; o lint remoto do schema public foi aprovado antes do checkout.
 - O PWA integra Supabase Auth com Google, e-mail/senha, sessão persistente, logout e recuperação de senha; compras e saldo ainda não estão associados à conta nesta etapa.
 - A Edge Function `checkout` cria uma ordem autenticada antes da preferência do Mercado Pago, aceita somente o pacote configurado e permanece bloqueada no ambiente de testes; o webhook ainda não concede créditos nesta etapa.
+- O checkout valida o JWT assimétrico da sessão dentro da Edge Function com `auth.getUser`, antes do body e de qualquer efeito financeiro; a verificação legada do gateway fica desativada somente nessa função.
+- Tentativas de checkout são preservadas por conta no navegador e o formato anterior é migrado sem trocar a chave. Recompra continua bloqueada até o webhook confirmar estado terminal e autorizar a rotação server-side.
+- A versão 2 da Edge Function `checkout` foi publicada no ambiente de testes com autenticação manual e smoke remoto aprovado para CORS e rejeição de sessão ausente/inválida; o checkout autenticado real ainda deve ser validado pelo site.
 - A estrategia comercial, hipoteses e criterios do experimento estao em `docs/MONETIZATION_STRATEGY.md`.
 - Mudancas futuras de preco, pacote, paywall ou checkout devem usar a skill local `tx-raio-x-monetization`.

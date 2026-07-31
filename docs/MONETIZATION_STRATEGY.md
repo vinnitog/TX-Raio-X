@@ -141,6 +141,40 @@ recuperação. Validar com chamadas repetidas usando a mesma chave e confirmar u
 valor/moeda, manter o checkout desativado, reconciliar o ambiente de teste e
 corrigir o fluxo antes do webhook.
 
+### Hardening do checkout autenticado
+
+Decisão registrada em 31 de julho de 2026: manter a oferta e a arquitetura
+comercial inalteradas, corrigindo somente duas garantias técnicas do checkout de
+teste.
+
+- A Edge Function continuará exigindo `Authorization: Bearer <JWT>`, validado no
+  próprio handler por `auth.getUser()`. A verificação JWT legada anterior ao
+  handler será desativada para aceitar o JWT assimétrico atual sem tornar a função
+  anônima.
+- Cada conta manterá sua própria tentativa pendente no navegador. Alternar A → B
+  → A deve reutilizar a chave de A e nunca criar uma segunda ordem por perda do
+  slot local.
+- O registro local anterior será migrado quando válido, preservando tentativas já
+  iniciadas. Storage bloqueado após reload permanece um risco residual até a
+  conciliação server-side por conta/status existir.
+
+Critérios: chamada sem token ou com token inválido recebe 401 antes de banco ou
+Mercado Pago; origem hostil continua em 403; repetições da mesma conta reutilizam
+a ordem; contas diferentes nunca compartilham chaves; preço, pacote, moeda,
+gratuidade e concessão de créditos não mudam. Falha em qualquer critério mantém o
+checkout de teste desativado e impede o webhook/credenciais de produção.
+
+Até o webhook fornecer um status terminal confiável, tentativas não expiram, não
+são removidas e não são rotacionadas pelo navegador. Isso preserva idempotência,
+mas significa que uma recompra intencional ainda não é suportada. O lifecycle que
+encerra a tentativa e libera uma nova chave é bloqueador explícito do pagamento
+real.
+
+Validação publicada: versão 2 da função `checkout`, ativa no projeto de testes com
+`verify_jwt=false`. O smoke remoto confirmou preflight permitido em 204, origem
+hostil em 403, ausência de bearer em 401 `authentication_required` e bearer
+inválido em 401 `invalid_session`, sempre sem efeito financeiro.
+
 ## Próximas iterações
 
 1. Rodar apenas a oferta de R$ 4,90 para evitar dividir o pouco tráfego.

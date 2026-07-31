@@ -199,3 +199,25 @@ nao tiverem implementacao, testes automatizados, teste integrado sandbox e
 evidencia de conciliacao. Depois disso, executar a matriz manual de aprovado,
 pendente, rejeitado, cancelado, webhook repetido, evento fora de ordem, reembolso
 integral, fraude, exclusao de usuario e recuperacao de saldo em outro aparelho.
+
+## Acompanhamento das correcoes
+
+Atualizado em 31 de julho de 2026, após a auditoria inicial:
+
+- a verificação JWT legada do gateway foi desativada somente para `checkout`; o
+  handler continua exigindo bearer e agora valida `auth.getUser(token)` antes de
+  interpretar o body ou tocar banco/Mercado Pago;
+- o body exige `application/json` e no máximo 4096 bytes;
+- tentativas pendentes passaram a ser isoladas por conta, com migração segura do
+  registro v1, última entrada válida determinística e persistência quando o
+  storage volta a funcionar;
+- o risco A → B → A foi resolvido e convertido em teste verde;
+- a suíte passou a 158 aprovados, 0 falhas e 1 `TODO` para reload com storage
+  totalmente bloqueado.
+- a versão 2 de `checkout` foi publicada no projeto de testes com
+  `verify_jwt=false`; smoke remoto confirmou CORS 204/403 e rejeições 401 geradas
+  pelo handler para bearer ausente ou inválido.
+
+Continuam bloqueadores: lifecycle server-side para encerrar tentativa e permitir
+recompra, rate limiting/limite de ordens ativas, timeout do Mercado Pago, webhook,
+ledger/consumo transacionais e hardening do deploy.

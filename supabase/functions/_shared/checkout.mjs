@@ -176,15 +176,32 @@ export function createCheckoutHandler({
         throw new CheckoutHttpError(401, "authentication_required", "Authentication is required.");
       }
 
-      const body = await request.json().catch(() => null);
-      const validation = validateCheckoutRequest(body, request.headers.get("Idempotency-Key"));
-      if (!validation.ok) {
-        throw new CheckoutHttpError(400, validation.code, "Invalid checkout request.");
-      }
-
       const user = await authenticate(token);
       if (!user?.id) {
         throw new CheckoutHttpError(401, "invalid_session", "The authenticated session is invalid.");
+      }
+
+      const contentType = request.headers.get("Content-Type")?.split(";", 1)[0]?.trim().toLowerCase();
+      if (contentType !== "application/json") {
+        throw new CheckoutHttpError(415, "unsupported_media_type", "Use application/json.");
+      }
+      const declaredLength = Number(request.headers.get("Content-Length"));
+      if (Number.isFinite(declaredLength) && declaredLength > 4096) {
+        throw new CheckoutHttpError(413, "request_too_large", "Checkout request is too large.");
+      }
+      const rawBody = await request.text();
+      if (new TextEncoder().encode(rawBody).byteLength > 4096) {
+        throw new CheckoutHttpError(413, "request_too_large", "Checkout request is too large.");
+      }
+      let body = null;
+      try {
+        body = JSON.parse(rawBody);
+      } catch {
+        // A valid JSON object is enforced by validateCheckoutRequest below.
+      }
+      const validation = validateCheckoutRequest(body, request.headers.get("Idempotency-Key"));
+      if (!validation.ok) {
+        throw new CheckoutHttpError(400, validation.code, "Invalid checkout request.");
       }
 
       const databaseIdempotencyKey = `checkout:${validation.idempotencyKey}`;
