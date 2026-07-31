@@ -133,6 +133,38 @@ export class CheckoutHttpError extends Error {
   }
 }
 
+export async function createOrGetOrderRecord(
+  supabaseAdmin,
+  { userId, idempotencyKey, offer },
+  orderFields
+) {
+  const { data: createdOrder, error: insertError } = await supabaseAdmin
+    .from("orders")
+    .upsert({
+      user_id: userId,
+      provider: "mercado_pago",
+      idempotency_key: idempotencyKey,
+      status: "creating_preference",
+      package_code: offer.code,
+      package_credits: offer.credits,
+      amount_cents: offer.amountCents,
+      currency: offer.currency
+    }, { onConflict: "idempotency_key", ignoreDuplicates: true })
+    .select(orderFields)
+    .maybeSingle();
+  if (insertError) throw insertError;
+  if (createdOrder) return { order: createdOrder, created: true };
+
+  const existing = await supabaseAdmin
+    .from("orders")
+    .select(orderFields)
+    .eq("user_id", userId)
+    .eq("idempotency_key", idempotencyKey)
+    .maybeSingle();
+  if (existing.error) throw existing.error;
+  return { order: existing.data, created: false };
+}
+
 function jsonResponse(body, status, corsHeaders) {
   return Response.json(body, {
     status,

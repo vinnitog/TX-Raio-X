@@ -7,6 +7,7 @@ let {
   CheckoutHttpError,
   buildPreferencePayload,
   createCheckoutHandler,
+  createOrGetOrderRecord,
   findPreferenceByExternalReference,
   getAllowedOrigins,
   getCheckoutUrl,
@@ -23,6 +24,7 @@ test.before(async () => {
     CheckoutHttpError,
     buildPreferencePayload,
     createCheckoutHandler,
+    createOrGetOrderRecord,
     findPreferenceByExternalReference,
     getAllowedOrigins,
     getCheckoutUrl,
@@ -162,10 +164,103 @@ test("CORS origin matching is exact and never expands to lookalikes", () => {
 
 test("Edge Function delegates HTTP behavior to the testable handler", async () => {
   const source = await readFile("supabase/functions/checkout/index.ts", "utf8");
+  const shared = await readFile("supabase/functions/_shared/checkout.mjs", "utf8");
   assert.match(source, /Deno\.serve\(createCheckoutHandler\(/);
   assert.match(source, /auth\.getUser\(token\)/);
-  assert.match(source, /package_credits: offer\.credits/);
   assert.match(source, /provider_preference_id: preferenceId/);
+  assert.match(source, /createOrGetOrderRecord\(getSupabaseAdmin\(\), args, ORDER_FIELDS\)/);
+  assert.match(shared, /package_credits: offer\.credits/);
+  assert.match(shared, /onConflict: "idempotency_key", ignoreDuplicates: true/);
+  assert.doesNotMatch(shared, /insertError\?\.code === "23505"/);
+});
+
+function orderStore({ insertedOrder = null, insertError = null, existingOrder = null, existingError = null } = {}) {
+  const calls = [];
+  const selectExisting = {
+    eq(column, value) {
+      calls.push(["eq", column, value]);
+      return this;
+    },
+    async maybeSingle() {
+      calls.push(["existing.maybeSingle"]);
+      return { data: existingOrder, error: existingError };
+    }
+  };
+  return {
+    calls,
+    client: {
+      from(table) {
+        calls.push(["from", table]);
+        return {
+          upsert(values, options) {
+            calls.push(["upsert", values, options]);
+            return {
+              select(fields) {
+                calls.push(["insert.select", fields]);
+                return {
+                  async maybeSingle() {
+                    calls.push(["insert.maybeSingle"]);
+                    return { data: insertedOrder, error: insertError };
+                  }
+                };
+              }
+            };
+          },
+          select(fields) {
+            calls.push(["existing.select", fields]);
+            return selectExisting;
+          }
+        };
+      }
+    }
+  };
+}
+
+test("order store inserts once and recovers a duplicate without a database error", async () => {
+  const args = {
+    userId: "user-1",
+    idempotencyKey: "checkout:key-1",
+    offer: CHECKOUT_OFFER
+  };
+  const fields = "id, status";
+  const created = { id: "order-1", status: "creating_preference" };
+  const first = orderStore({ insertedOrder: created });
+  assert.deepEqual(await createOrGetOrderRecord(first.client, args, fields), {
+    order: created,
+    created: true
+  });
+  assert.equal(first.calls.some(([name]) => name === "existing.select"), false);
+  assert.deepEqual(first.calls.find(([name]) => name === "upsert")[2], {
+    onConflict: "idempotency_key",
+    ignoreDuplicates: true
+  });
+
+  const retry = orderStore({ existingOrder: created });
+  assert.deepEqual(await createOrGetOrderRecord(retry.client, args, fields), {
+    order: created,
+    created: false
+  });
+  assert.deepEqual(retry.calls.filter(([name]) => name === "eq"), [
+    ["eq", "user_id", "user-1"],
+    ["eq", "idempotency_key", "checkout:key-1"]
+  ]);
+});
+
+test("order store propagates insert and recovery errors", async () => {
+  const args = { userId: "user-1", idempotencyKey: "checkout:key-1", offer: CHECKOUT_OFFER };
+  const insertError = new Error("insert unavailable");
+  await assert.rejects(createOrGetOrderRecord(
+    orderStore({ insertError }).client,
+    args,
+    "id"
+  ), insertError);
+
+  const existingError = new Error("read unavailable");
+  await assert.rejects(createOrGetOrderRecord(
+    orderStore({ existingError }).client,
+    args,
+    "id"
+  ), existingError);
 });
 
 test("Supabase delegates JWT verification to the authenticated checkout handler", async () => {

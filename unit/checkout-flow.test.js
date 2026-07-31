@@ -23,6 +23,131 @@ function fakeButton() {
   };
 }
 
+function fakeCheckoutWindow({
+  blocked = false,
+  closed = false,
+  openerIgnored = false,
+  openerThrows = false,
+  openerGetterThrows = false,
+  replaceThrows = false
+} = {}) {
+  const calls = [];
+  let opener = { unsafe: true };
+  const tab = {
+    closed,
+    location: {
+      replace(url) {
+        if (replaceThrows) throw new Error("navigation blocked");
+        calls.push(["replace", url]);
+      }
+    },
+    close() {
+      calls.push(["close"]);
+      this.closed = true;
+    }
+  };
+  Object.defineProperty(tab, "opener", {
+    configurable: true,
+    get() {
+      if (openerGetterThrows) throw new Error("opener getter protected");
+      return opener;
+    },
+    set(value) {
+      if (openerThrows) throw new Error("opener protected");
+      if (!openerIgnored) opener = value;
+    }
+  });
+  return {
+    calls,
+    tab,
+    window: {
+      open(...args) {
+        calls.push(["open", ...args]);
+        return blocked ? null : tab;
+      }
+    }
+  };
+}
+
+test("checkout tab opens synchronously without an opener and navigates after checkout is ready", async () => {
+  const { openCheckoutTab } = await import("../js/checkout-flow.mjs");
+  const browser = fakeCheckoutWindow();
+  const checkoutTab = openCheckoutTab(browser.window);
+
+  assert.deepEqual(browser.calls, [["open", "about:blank", "_blank"]]);
+  assert.equal(browser.tab.opener, null);
+  assert.equal(checkoutTab.navigate("https://sandbox.mercadopago.com/checkout/pref-1"), true);
+  assert.deepEqual(browser.calls.at(-1), ["replace", "https://sandbox.mercadopago.com/checkout/pref-1"]);
+});
+
+test("checkout tab fails closed when popup or delayed navigation is unavailable", async () => {
+  const { openCheckoutTab } = await import("../js/checkout-flow.mjs");
+  assert.equal(openCheckoutTab(fakeCheckoutWindow({ blocked: true }).window), null);
+
+  const closed = fakeCheckoutWindow({ closed: true });
+  assert.equal(openCheckoutTab(closed.window).navigate("https://sandbox.mercadopago.com/checkout"), false);
+  assert.equal(closed.calls.some(([name]) => name === "replace"), false);
+
+  const rejected = fakeCheckoutWindow({ replaceThrows: true });
+  assert.equal(openCheckoutTab(rejected.window).navigate("https://sandbox.mercadopago.com/checkout"), false);
+});
+
+test("checkout tab is discarded when opener isolation cannot be guaranteed", async () => {
+  const { openCheckoutTab } = await import("../js/checkout-flow.mjs");
+  for (const browser of [
+    fakeCheckoutWindow({ openerIgnored: true }),
+    fakeCheckoutWindow({ openerThrows: true }),
+    fakeCheckoutWindow({ openerGetterThrows: true })
+  ]) {
+    assert.equal(openCheckoutTab(browser.window), null);
+    assert.equal(browser.tab.closed, true);
+    assert.equal(browser.calls.filter(([name]) => name === "close").length, 1);
+  }
+});
+
+test("failed popup and same-tab navigation is contained and closes the auxiliary tab", async () => {
+  const { navigateToCheckout, openCheckoutTab } = await import("../js/checkout-flow.mjs");
+  const browser = fakeCheckoutWindow({ replaceThrows: true });
+  const checkoutTab = openCheckoutTab(browser.window);
+  const destination = navigateToCheckout(checkoutTab, "https://sandbox.mercadopago.com/checkout", {
+    assign() { throw new Error("same-tab navigation blocked"); }
+  });
+  assert.equal(destination, "failed");
+  assert.equal(browser.tab.closed, true);
+  assert.equal(browser.calls.filter(([name]) => name === "close").length, 1);
+});
+
+test("failed or blocked new-tab navigation closes it before same-tab fallback", async () => {
+  const { navigateToCheckout, openCheckoutTab } = await import("../js/checkout-flow.mjs");
+  for (const browser of [
+    fakeCheckoutWindow({ blocked: true }),
+    fakeCheckoutWindow({ replaceThrows: true })
+  ]) {
+    const assignments = [];
+    const checkoutTab = openCheckoutTab(browser.window);
+    const destination = navigateToCheckout(
+      checkoutTab,
+      "https://sandbox.mercadopago.com/checkout/pref-1",
+      { assign: (url) => assignments.push(url) }
+    );
+
+    assert.equal(destination, "same_tab");
+    assert.deepEqual(assignments, ["https://sandbox.mercadopago.com/checkout/pref-1"]);
+    if (checkoutTab) assert.equal(browser.tab.closed, true);
+  }
+});
+
+test("unused checkout tab closes after authentication or checkout failure", async () => {
+  const { openCheckoutTab } = await import("../js/checkout-flow.mjs");
+  const browser = fakeCheckoutWindow();
+  const checkoutTab = openCheckoutTab(browser.window);
+  checkoutTab.close();
+  checkoutTab.close();
+
+  assert.equal(browser.tab.closed, true);
+  assert.equal(browser.calls.filter(([name]) => name === "close").length, 1);
+});
+
 test("double click keeps both CTAs loading and admits a single checkout call", async () => {
   const { createCheckoutLoadingController } = await import("../js/checkout-flow.mjs");
   const buttons = [fakeButton(), fakeButton()];
@@ -95,6 +220,18 @@ for (const status of ["success", "pending", "failure"]) {
   });
 }
 
+test("checkout return removes every Mercado Pago parameter observed in sandbox", async () => {
+  const { sanitizeCheckoutReturn } = await import("../js/checkout-flow.mjs");
+  const result = sanitizeCheckoutReturn(
+    "https://app.example.com/?campaign=beta&checkout_status=success&collection_id=123&collection_status=approved&payment_id=123&status=approved&external_reference=order-1&merchant_order_id=456&preference_id=pref-1&payment_type=account_money&site_id=MLB&processing_mode=aggregator&merchant_account_id=null#result"
+  );
+  const cleaned = new URL(result.cleanedUrl);
+
+  assert.equal(result.status, "success");
+  assert.equal(cleaned.search, "?campaign=beta");
+  assert.equal(cleaned.hash, "#result");
+});
+
 test("checkout return preserves Supabase auth parameters and fragment", async () => {
   const { sanitizeCheckoutReturn } = await import("../js/checkout-flow.mjs");
   const result = sanitizeCheckoutReturn(
@@ -115,4 +252,61 @@ test("ordinary auth return without checkout marker is left untouched", async () 
     sanitizeCheckoutReturn("https://app.example.com/?code=auth-code&type=recovery#account"),
     { status: null, cleanedUrl: null }
   );
+});
+
+test("checkout return cleanup never interrupts initialization when history throws", async () => {
+  const { replaceCheckoutReturn, sanitizeCheckoutReturn } = await import("../js/checkout-flow.mjs");
+  const usage = { credits: 4, freeUsed: 2 };
+  const result = sanitizeCheckoutReturn("https://app.example.com/?checkout_status=success&payment_id=123");
+  assert.equal(replaceCheckoutReturn({
+    replaceState() { throw new Error("history blocked"); }
+  }, result.cleanedUrl), false);
+  assert.deepEqual(usage, { credits: 4, freeUsed: 2 });
+});
+
+test("orchestrated auth_required closes the blank tab, restores loading and starts once", async () => {
+  const { createCheckoutLoadingController, openCheckoutTab, runCheckoutAttempt } = await import("../js/checkout-flow.mjs");
+  const browser = fakeCheckoutWindow();
+  const loading = createCheckoutLoadingController([fakeButton(), fakeButton()]);
+  let starts = 0;
+  let authOpens = 0;
+  const outcome = await runCheckoutAttempt({
+    loading,
+    openTab: () => openCheckoutTab(browser.window),
+    startCheckout: async () => { starts += 1; return { status: "auth_required" }; },
+    openAuth: async () => { authOpens += 1; return true; },
+    navigate: () => assert.fail("auth flow must not navigate")
+  });
+  assert.deepEqual(outcome, { status: "auth_required" });
+  assert.equal(starts, 1);
+  assert.equal(authOpens, 1);
+  assert.equal(browser.tab.closed, true);
+  assert.equal(loading.tryStart(), true, "loading must be restored");
+});
+
+test("closed tab while checkout waits falls back once to same-tab navigation", async () => {
+  const { createCheckoutLoadingController, navigateToCheckout, openCheckoutTab, runCheckoutAttempt } = await import("../js/checkout-flow.mjs");
+  const browser = fakeCheckoutWindow();
+  const buttons = [fakeButton(), fakeButton()];
+  const loading = createCheckoutLoadingController(buttons);
+  let resolveCheckout;
+  let starts = 0;
+  const pendingCheckout = new Promise((resolve) => { resolveCheckout = resolve; });
+  const assignments = [];
+  const options = {
+    loading,
+    openTab: () => openCheckoutTab(browser.window),
+    startCheckout: async () => { starts += 1; return pendingCheckout; },
+    openAuth: () => false,
+    navigate: (tab, url) => navigateToCheckout(tab, url, { assign: (value) => assignments.push(value) })
+  };
+  const first = runCheckoutAttempt(options);
+  const second = await runCheckoutAttempt(options);
+  assert.deepEqual(second, { status: "busy" });
+  browser.tab.closed = true;
+  resolveCheckout({ status: "ready", checkoutUrl: "https://sandbox.mercadopago.com/checkout/pref-1" });
+  assert.deepEqual(await first, { status: "same_tab" });
+  assert.equal(starts, 1);
+  assert.deepEqual(assignments, ["https://sandbox.mercadopago.com/checkout/pref-1"]);
+  assert.equal(buttons.every((button) => button.disabled), true);
 });
