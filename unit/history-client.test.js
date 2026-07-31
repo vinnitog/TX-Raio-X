@@ -77,6 +77,125 @@ test("merges, sorts and deduplicates histories from responding networks", async 
   assert.equal(result.searchedNetworks, 4);
 });
 
+test("applies the wallet history limit globally after merging compatible networks", async () => {
+  const { findRecentTransactions } = await import("../js/history-client.mjs");
+  const address = `0x${"a".repeat(40)}`;
+  const timestampsByHost = {
+    "eth.blockscout.com": 100,
+    "base.blockscout.com": 400,
+    "arbitrum.blockscout.com": 300,
+    "polygon.blockscout.com": 200
+  };
+
+  const fetchMock = async (url) => {
+    const timestamp = timestampsByHost[url.hostname];
+    return jsonResponse({
+      status: "1",
+      message: "OK",
+      result: [{
+        hash: `0x${String(timestamp / 100).repeat(64)}`,
+        from: address,
+        timeStamp: String(timestamp),
+        isError: "0",
+        functionName: ""
+      }]
+    });
+  };
+
+  const result = await findRecentTransactions(address, "auto", 3, fetchMock);
+
+  assert.deepEqual(
+    result.transactions.map(({ networkId }) => networkId),
+    ["base", "arbitrum", "polygon"]
+  );
+  assert.equal(result.transactions.length, 3);
+  assert.equal(result.searchedNetworks, 4);
+});
+
+test("applies the paid history limit of ten only after merging all networks", async () => {
+  const { findRecentTransactions } = await import("../js/history-client.mjs");
+  const { getHistoryLimit } = await import("../js/usage.mjs");
+  const address = `0x${"a".repeat(40)}`;
+  const timestampsByHost = {
+    "eth.blockscout.com": [120, 80, 40],
+    "base.blockscout.com": [110, 70, 30],
+    "arbitrum.blockscout.com": [100, 60, 20],
+    "polygon.blockscout.com": [90, 50, 10]
+  };
+  const requestedOffsets = [];
+  const paidLimit = getHistoryLimit({ paid: true, unlocked: false }, 3, 10);
+
+  const fetchMock = async (url) => {
+    requestedOffsets.push(url.searchParams.get("offset"));
+    return jsonResponse({
+      status: "1",
+      message: "OK",
+      result: timestampsByHost[url.hostname].map((timestamp) => ({
+        hash: `0x${timestamp.toString(16).padStart(64, "0")}`,
+        from: address,
+        timeStamp: String(timestamp),
+        isError: "0",
+        functionName: ""
+      }))
+    });
+  };
+
+  const result = await findRecentTransactions(address, "auto", paidLimit, fetchMock);
+
+  assert.equal(paidLimit, 10);
+  assert.deepEqual(requestedOffsets, ["10", "10", "10", "10"]);
+  assert.deepEqual(
+    result.transactions.map(({ timestamp }) => timestamp),
+    [120, 110, 100, 90, 80, 70, 60, 50, 40, 30]
+  );
+});
+
+test("automatic wallet search queries each indexed host once and never queries BNB", async () => {
+  const { findRecentTransactions } = await import("../js/history-client.mjs");
+  const requestedHosts = [];
+  const fetchMock = async (url) => {
+    requestedHosts.push(url.hostname);
+    return jsonResponse({ status: "0", message: "No transactions found", result: [] });
+  };
+
+  const result = await findRecentTransactions(
+    `0x${"a".repeat(40)}`,
+    "auto",
+    3,
+    fetchMock
+  );
+
+  assert.deepEqual(requestedHosts, [
+    "eth.blockscout.com",
+    "base.blockscout.com",
+    "arbitrum.blockscout.com",
+    "polygon.blockscout.com"
+  ]);
+  assert.equal(new Set(requestedHosts).size, 4);
+  assert.equal(result.searchedNetworks, 4);
+});
+
+test("deduplicates repeated hashes within the same network", async () => {
+  const { findRecentTransactions } = await import("../js/history-client.mjs");
+  const address = `0x${"a".repeat(40)}`;
+  const repeatedHash = `0x${"f".repeat(64)}`;
+  const fetchMock = async () =>
+    jsonResponse({
+      status: "1",
+      message: "OK",
+      result: [
+        { hash: repeatedHash, from: address, timeStamp: "100", isError: "0", functionName: "" },
+        { hash: repeatedHash, from: address, timeStamp: "200", isError: "0", functionName: "" }
+      ]
+    });
+
+  const result = await findRecentTransactions(address, "ethereum", 3, fetchMock);
+
+  assert.equal(result.transactions.length, 1);
+  assert.equal(result.transactions[0].hash, repeatedHash);
+  assert.equal(result.transactions[0].timestamp, 200);
+});
+
 test("returns an empty result when a network responds with no transactions", async () => {
   const { findRecentTransactions } = await import("../js/history-client.mjs");
   const fetchMock = async () =>
