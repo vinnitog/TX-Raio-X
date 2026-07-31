@@ -128,10 +128,36 @@ test("an uncertain checkout receives a recovery lease only after five minutes", 
 
 test("CORS allows only configured origins", () => {
   const allowed = getAllowedOrigins("https://example.com/app", "https://admin.example.com");
+  const headers = getCorsHeaders("https://example.com", allowed);
   assert.equal(allowed.has("https://example.com"), true);
   assert.equal(allowed.has("https://admin.example.com"), true);
   assert.equal(getCorsHeaders("https://evil.example", allowed)["Access-Control-Allow-Origin"], undefined);
-  assert.equal(getCorsHeaders("https://example.com", allowed)["Access-Control-Allow-Origin"], "https://example.com");
+  assert.equal(headers["Access-Control-Allow-Origin"], "https://example.com");
+  assert.deepEqual(
+    headers["Access-Control-Allow-Headers"].split(",").map((header) => header.trim()),
+    ["authorization", "x-client-info", "apikey", "content-type", "idempotency-key"]
+  );
+  assert.equal(headers["Access-Control-Allow-Methods"], "POST, OPTIONS");
+  assert.equal(headers.Vary, "Origin");
+  assert.equal(headers["Access-Control-Allow-Credentials"], undefined);
+  assert.doesNotMatch(headers["Access-Control-Allow-Headers"], /\*/);
+});
+
+test("CORS origin matching is exact and never expands to lookalikes", () => {
+  const allowed = getAllowedOrigins("https://app.example.com/return", "https://admin.example.com");
+  for (const origin of [
+    "https://app.example.com.evil.test",
+    "https://sub.app.example.com",
+    "http://app.example.com",
+    "https://app.example.com:444",
+    "https://app.example.com."
+  ]) {
+    assert.equal(getCorsHeaders(origin, allowed)["Access-Control-Allow-Origin"], undefined, origin);
+  }
+  assert.equal(
+    getCorsHeaders("https://admin.example.com", allowed)["Access-Control-Allow-Origin"],
+    "https://admin.example.com"
+  );
 });
 
 test("Edge Function delegates HTTP behavior to the testable handler", async () => {
@@ -258,14 +284,35 @@ async function responseBody(response) {
   return { response, body: await response.json() };
 }
 
-test("behavior: CORS preflight is side-effect free and an unknown origin is rejected", async () => {
+test("behavior: Supabase client preflight is allowed without side effects and an unknown origin is rejected", async () => {
   const harness = createHarness();
-  const preflight = await harness.handler(checkoutRequest({ method: "OPTIONS", token: null, key: null, body: null }));
+  const preflightRequest = checkoutRequest({ method: "OPTIONS", token: null, key: null, body: null });
+  preflightRequest.headers.set(
+    "Access-Control-Request-Headers",
+    "authorization,apikey,content-type,idempotency-key,x-client-info"
+  );
+  preflightRequest.headers.set("Access-Control-Request-Method", "POST");
+  const preflight = await harness.handler(preflightRequest);
   assert.equal(preflight.status, 204);
   assert.equal(preflight.headers.get("Access-Control-Allow-Origin"), "https://app.example.com");
+  assert.equal(
+    preflight.headers.get("Access-Control-Allow-Headers"),
+    "authorization, x-client-info, apikey, content-type, idempotency-key"
+  );
+  assert.equal(preflight.headers.get("Access-Control-Allow-Methods"), "POST, OPTIONS");
+  assert.equal(preflight.headers.get("Vary"), "Origin");
   assert.deepEqual(harness.events, []);
 
-  const { response, body } = await responseBody(await harness.handler(checkoutRequest({ origin: "https://evil.example" })));
+  const rejectedPreflight = checkoutRequest({
+    method: "OPTIONS",
+    origin: "https://app.example.com.evil.test",
+    token: null,
+    key: null,
+    body: null
+  });
+  rejectedPreflight.headers.set("Access-Control-Request-Method", "POST");
+  rejectedPreflight.headers.set("Access-Control-Request-Headers", "x-client-info,authorization");
+  const { response, body } = await responseBody(await harness.handler(rejectedPreflight));
   assert.equal(response.status, 403);
   assert.equal(response.headers.get("Access-Control-Allow-Origin"), null);
   assert.equal(body.error, "origin_not_allowed");

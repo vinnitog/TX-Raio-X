@@ -113,7 +113,7 @@ export function getAllowedOrigins(returnUrl, configuredOrigins = "") {
 
 export function getCorsHeaders(origin, allowedOrigins) {
   const headers = {
-    "Access-Control-Allow-Headers": "authorization, apikey, content-type, idempotency-key",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, idempotency-key",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Vary": "Origin"
   };
