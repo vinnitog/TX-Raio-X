@@ -25,6 +25,10 @@ import { CheckoutClientError, createCheckoutClient } from "./checkout-client.mjs
 import {
   createCheckoutLoadingController,
   createRetryableLoader,
+  navigateToCheckout,
+  openCheckoutTab,
+  replaceCheckoutReturn,
+  runCheckoutAttempt,
   sanitizeCheckoutReturn
 } from "./checkout-flow.mjs";
 import { initAuthController } from "./auth-controller.mjs";
@@ -595,27 +599,33 @@ async function beginCheckout() {
     return;
   }
 
-  if (!checkoutLoading.tryStart()) return;
-  let redirectStarted = false;
   try {
-    const checkoutClient = await getCheckoutClient();
-    const checkout = await checkoutClient.start();
-    if (checkout.status === "auth_required") {
-      const authController = await authControllerPromise;
-      if (!authController?.open()) {
-        showToast("A conta está indisponível agora. Verifique sua conexão e tente novamente.");
-        return;
-      }
+    const outcome = await runCheckoutAttempt({
+      loading: checkoutLoading,
+      openTab: () => openCheckoutTab(window),
+      startCheckout: async () => (await getCheckoutClient()).start(),
+      openAuth: async () => (await authControllerPromise)?.open() ?? false,
+      navigate: (tab, url) => navigateToCheckout(tab, url, window.location)
+    });
+    if (outcome.status === "auth_unavailable") {
+      showToast("A conta está indisponível agora. Verifique sua conexão e tente novamente.");
+      return;
+    }
+    if (outcome.status === "auth_required") {
       if (elements.paywall.open) elements.paywall.close();
       showToast("Entre na sua conta e depois toque em Comprar novamente.");
       return;
     }
-    redirectStarted = true;
-    window.location.assign(checkout.checkoutUrl);
+    if (outcome.status === "new_tab") {
+      if (elements.paywall.open) elements.paywall.close();
+      showToast("Checkout aberto em uma nova aba. Mantenha esta página aberta.");
+      return;
+    }
+    if (outcome.status === "failed") {
+      showToast("Não conseguimos abrir o checkout agora. Verifique sua conexão e tente novamente.");
+    }
   } catch (error) {
     showToast(getCheckoutErrorMessage(error));
-  } finally {
-    if (!redirectStarted) checkoutLoading.stop();
   }
 }
 
@@ -629,7 +639,7 @@ function handleCheckoutReturn() {
     failure: "O pagamento de teste não foi concluído. Nenhuma análise foi liberada."
   };
   showToast(messages[status] ?? "Você voltou do checkout de teste.", 7000);
-  window.history.replaceState({}, "", cleanedUrl);
+  replaceCheckoutReturn(window.history, cleanedUrl);
 }
 
 elements.form.addEventListener("submit", async (event) => {

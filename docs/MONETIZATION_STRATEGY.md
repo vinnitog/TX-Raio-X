@@ -184,6 +184,33 @@ origin `https://vinnitog.github.io` recebeu 204 com todos os headers esperados;
 origin semelhante e não autorizado recebeu 403 `origin_not_allowed` sem
 `Access-Control-Allow-Origin`.
 
+### Retorno do checkout e observabilidade
+
+Decisão registrada após o primeiro pagamento aprovado no sandbox: manter preço,
+pacote, gratuidade e concessão de créditos inalterados, refinando somente a
+experiência e a leitura operacional do checkout.
+
+- O checkout abre em uma nova aba criada diretamente pelo gesto do usuário. Se o
+  navegador bloquear a aba ou ela for fechada antes do redirecionamento, o fluxo
+  usa a aba atual como fallback; a referência `opener` é removida antes de entregar
+  a navegação ao Mercado Pago. Se esse isolamento não puder ser confirmado, a aba
+  auxiliar é fechada e nunca recebe a URL externa.
+- O retorno remove apenas os parâmetros conhecidos do Mercado Pago, incluindo
+  `processing_mode` e `merchant_account_id`, e preserva parâmetros de autenticação,
+  campanha e fragmentos que não pertencem ao pagamento.
+- Repetir uma chave de checkout continua recuperando a mesma ordem, mas o conflito
+  esperado deixa de gerar um erro `23505` nos logs: a escrita ignora a duplicata e
+  consulta a ordem pelo mesmo usuário e chave.
+- Um retorno `success` continua sendo apenas informativo. Nenhum saldo é liberado
+  por URL; somente o webhook e o ledger server-side poderão confirmar a compra.
+
+Critérios: uma única chamada por duplo clique, fallback quando popup for bloqueado,
+fechamento da aba vazia em autenticação/falha, URL limpa após sucesso/pendência/
+falha, preservação dos parâmetros não financeiros e uma única ordem por chave.
+Edge Function atualizada no ambiente de testes em 31/07/2026; o smoke remoto
+confirmou preflight 204 com a allowlist esperada e POST sem sessão em 401
+`authentication_required`, sem efeito financeiro.
+
 ## Próximas iterações
 
 1. Rodar apenas a oferta de R$ 4,90 para evitar dividir o pouco tráfego.

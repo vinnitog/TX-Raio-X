@@ -55,7 +55,7 @@ test("the installable entry point links the manifest and registers the service w
 test("service worker uses a versioned cache and includes wallet history code", () => {
   const serviceWorker = read("sw.js");
 
-  assert.match(serviceWorker, /const CACHE_NAME = ["']tx-raio-x-v42["'];/);
+  assert.match(serviceWorker, /const CACHE_NAME = ["']tx-raio-x-v44["'];/);
   assert.ok(
     appShellEntries().includes("./js/history-client.mjs"),
     "wallet history client should be cached for offline app startup"
@@ -240,10 +240,10 @@ test("local demo simulates purchase while hosted checkout requires auth and neve
     /catch \{[\s\S]*?return false;[\s\S]*?return true;/
   );
   assert.match(beginCheckout, /if \(IS_LOCAL_DEMO\)[\s\S]*?activateCreditPack\([\s\S]*?return;/);
-  assert.match(beginCheckout, /checkoutClient\.start\(\)/);
-  assert.match(beginCheckout, /checkout\.status === ["']auth_required["']/);
-  assert.match(beginCheckout, /authController\?\.open\(\)/);
-  assert.match(beginCheckout, /window\.location\.assign\(checkout\.checkoutUrl\)/);
+  assert.match(beginCheckout, /startCheckout:\s*async \(\) => \(await getCheckoutClient\(\)\)\.start\(\)/);
+  assert.match(beginCheckout, /outcome\.status === ["']auth_required["']/);
+  assert.match(beginCheckout, /openAuth:\s*async \(\) => \(await authControllerPromise\)\?\.open\(\)/);
+  assert.match(beginCheckout, /navigate:\s*\(tab, url\) => navigateToCheckout\(tab, url, window\.location\)/);
   assert.doesNotMatch(handleCheckoutReturn, /activateCreditPack|addCredits|applyCreditGrant/);
   assert.doesNotMatch(app, /priceSection\.hidden = true/);
   assert.match(app, /getRemaining\(usage,\s*FREE_ANALYSES\)/);
@@ -260,7 +260,9 @@ test("local demo simulates purchase while hosted checkout requires auth and neve
     /function activateCreditPack\(message\)[\s\S]*?catch \{[\s\S]*?return false;[\s\S]*?return true;/
   );
   assert.match(app, /createCheckoutLoadingController\([\s\S]*?elements\.dialogUnlock/);
-  assert.match(app, /if \(!redirectStarted\) checkoutLoading\.stop\(\)/);
+  assert.match(app, /runCheckoutAttempt\(\{/);
+  assert.match(app, /openTab:\s*\(\) => openCheckoutTab\(window\)/);
+  assert.match(app, /navigate:\s*\(tab, url\) => navigateToCheckout\(tab, url, window\.location\)/);
   assert.match(app, /addEventListener\(["']pageshow["'][\s\S]*?restoreAfterPageShow\(\)/);
   assert.match(app, /createRetryableLoader\([\s\S]*?import\(["']\.\/supabase-client\.mjs["']\)/);
   assert.match(index, /class=["']checkout-loading-label["'][^>]*hidden>Abrindo checkout…/);

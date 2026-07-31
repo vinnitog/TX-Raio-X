@@ -1,7 +1,87 @@
 const FINANCIAL_RETURN_PARAMETERS = Object.freeze([
   "checkout_status", "collection_id", "collection_status", "payment_id", "status",
-  "external_reference", "merchant_order_id", "preference_id", "payment_type", "site_id"
+  "external_reference", "merchant_order_id", "preference_id", "payment_type", "site_id",
+  "processing_mode", "merchant_account_id"
 ]);
+
+export function openCheckoutTab(windowLike) {
+  let tab;
+  try {
+    tab = windowLike.open("about:blank", "_blank");
+  } catch {
+    return null;
+  }
+  if (!tab) return null;
+
+  try {
+    tab.opener = null;
+    if (tab.opener !== null) {
+      tab.close();
+      return null;
+    }
+  } catch {
+    try {
+      tab.close();
+    } catch {
+      // A aba atual continua sendo o fallback seguro.
+    }
+    return null;
+  }
+
+  return Object.freeze({
+    navigate(url) {
+      try {
+        if (tab.closed) return false;
+        tab.location.replace(url);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    close() {
+      try {
+        if (!tab.closed) tab.close();
+      } catch {
+        // Fechar a aba auxiliar é uma melhoria de UX, não requisito do checkout.
+      }
+    }
+  });
+}
+
+export function navigateToCheckout(checkoutTab, checkoutUrl, locationLike) {
+  try {
+    if (checkoutTab?.navigate(checkoutUrl)) return "new_tab";
+  } catch {
+    // A navegação na aba auxiliar pode ser bloqueada depois que ela foi aberta.
+  }
+  checkoutTab?.close();
+  try {
+    locationLike.assign(checkoutUrl);
+    return "same_tab";
+  } catch {
+    return "failed";
+  }
+}
+
+export async function runCheckoutAttempt({ loading, openTab, startCheckout, openAuth, navigate }) {
+  if (!loading.tryStart()) return { status: "busy" };
+  const checkoutTab = openTab();
+  let checkoutOpened = false;
+  let sameTabRedirectStarted = false;
+  try {
+    const checkout = await startCheckout();
+    if (checkout.status === "auth_required") {
+      return { status: await openAuth() ? "auth_required" : "auth_unavailable" };
+    }
+    const destination = navigate(checkoutTab, checkout.checkoutUrl);
+    checkoutOpened = destination === "new_tab";
+    sameTabRedirectStarted = destination === "same_tab";
+    return { status: destination };
+  } finally {
+    if (!checkoutOpened && !sameTabRedirectStarted) checkoutTab?.close();
+    if (!sameTabRedirectStarted) loading.stop();
+  }
+}
 
 function renderCheckoutLoading(buttons, isLoading) {
   for (const button of buttons) {
@@ -59,4 +139,13 @@ export function sanitizeCheckoutReturn(href) {
     url.searchParams.delete(parameter);
   }
   return { status, cleanedUrl: url.toString() };
+}
+
+export function replaceCheckoutReturn(historyLike, cleanedUrl) {
+  try {
+    historyLike.replaceState({}, "", cleanedUrl);
+    return true;
+  } catch {
+    return false;
+  }
 }

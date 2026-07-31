@@ -108,5 +108,6 @@ git diff --check
 - O checkout valida o JWT assimétrico da sessão dentro da Edge Function com `auth.getUser`, antes do body e de qualquer efeito financeiro; a verificação legada do gateway fica desativada somente nessa função.
 - Tentativas de checkout são preservadas por conta no navegador e o formato anterior é migrado sem trocar a chave. Recompra continua bloqueada até o webhook confirmar estado terminal e autorizar a rotação server-side.
 - A versão 2 da Edge Function `checkout` foi publicada no ambiente de testes com autenticação manual e smoke remoto aprovado para CORS e rejeição de sessão ausente/inválida; o checkout autenticado real ainda deve ser validado pelo site.
+- O primeiro pagamento aprovado no sandbox confirmou o redirecionamento; o checkout passa a abrir em nova aba com fallback seguro, limpa todos os parâmetros conhecidos do Mercado Pago no retorno e evita registrar como erro o conflito idempotente esperado ao recuperar a mesma ordem. A Edge Function refinada foi publicada e passou nos smokes remotos de CORS e autenticação; o retorno não concede créditos antes do webhook.
 - A estrategia comercial, hipoteses e criterios do experimento estao em `docs/MONETIZATION_STRATEGY.md`.
 - Mudancas futuras de preco, pacote, paywall ou checkout devem usar a skill local `tx-raio-x-monetization`.

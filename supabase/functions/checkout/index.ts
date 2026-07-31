@@ -1,5 +1,9 @@
 import { createClient } from "npm:@supabase/supabase-js@2.111.0";
-import { CheckoutHttpError, createCheckoutHandler } from "../_shared/checkout.mjs";
+import {
+  CheckoutHttpError,
+  createCheckoutHandler,
+  createOrGetOrderRecord
+} from "../_shared/checkout.mjs";
 
 const MERCADO_PAGO_API_URL = "https://api.mercadopago.com";
 
@@ -63,35 +67,7 @@ Deno.serve(createCheckoutHandler({
     const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(token);
     return authError ? null : authData.user;
   },
-  createOrGetOrder: async ({ userId, idempotencyKey, offer }) => {
-    const supabaseAdmin = getSupabaseAdmin();
-    const { data: createdOrder, error: insertError } = await supabaseAdmin
-      .from("orders")
-      .insert({
-        user_id: userId,
-        provider: "mercado_pago",
-        idempotency_key: idempotencyKey,
-        status: "creating_preference",
-        package_code: offer.code,
-        package_credits: offer.credits,
-        amount_cents: offer.amountCents,
-        currency: offer.currency
-      })
-      .select(ORDER_FIELDS)
-      .single();
-    if (insertError?.code === "23505") {
-      const existing = await supabaseAdmin
-        .from("orders")
-        .select(ORDER_FIELDS)
-        .eq("user_id", userId)
-        .eq("idempotency_key", idempotencyKey)
-        .maybeSingle();
-      if (existing.error) throw existing.error;
-      return { order: existing.data, created: false };
-    }
-    if (insertError) throw insertError;
-    return { order: createdOrder, created: true };
-  },
+  createOrGetOrder: (args) => createOrGetOrderRecord(getSupabaseAdmin(), args, ORDER_FIELDS),
   acquireRecoveryLease: async (order) => {
     const lease = await getSupabaseAdmin()
           .from("orders")
