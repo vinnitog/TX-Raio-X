@@ -5,7 +5,7 @@
 project_id = "cripto-project"
 
 [functions.checkout]
-verify_jwt = true
+verify_jwt = false
 
 [api]
 enabled = true

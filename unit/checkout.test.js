@@ -142,9 +142,15 @@ test("Edge Function delegates HTTP behavior to the testable handler", async () =
   assert.match(source, /provider_preference_id: preferenceId/);
 });
 
-test("Supabase keeps JWT verification enabled for checkout", async () => {
+test("Supabase delegates JWT verification to the authenticated checkout handler", async () => {
   const config = await readFile("supabase/config.toml", "utf8");
-  assert.match(config, /\[functions\.checkout\]\s+verify_jwt = true/);
+  const handler = await readFile("supabase/functions/_shared/checkout.mjs", "utf8");
+  const index = await readFile("supabase/functions/checkout/index.ts", "utf8");
+  assert.match(config, /\[functions\.checkout\]\s+verify_jwt = false/);
+  assert.match(handler, /Authorization/);
+  assert.match(handler, /if \(!token\)/);
+  assert.match(handler, /await authenticate\(token\)/);
+  assert.match(index, /auth\.getUser\(token\)/);
 });
 
 function checkoutRequest({
@@ -275,12 +281,14 @@ test("behavior: authentication and input are validated before database/provider 
   result = await responseBody(await harness.handler(checkoutRequest({ body: { packageCode: "forged" } })));
   assert.equal(result.response.status, 400);
   assert.equal(result.body.error, "invalid_package");
-  assert.deepEqual(harness.events, []);
+  assert.deepEqual(harness.events, ["auth:valid-token"]);
 
   result = await responseBody(await harness.handler(checkoutRequest({ token: "expired" })));
   assert.equal(result.response.status, 401);
   assert.equal(result.body.error, "invalid_session");
-  assert.deepEqual(harness.events, ["auth:expired"]);
+  assert.deepEqual(harness.events, ["auth:valid-token", "auth:expired"]);
+  assert.equal(harness.orders.size, 0);
+  assert.equal(harness.providerRequests.length, 0);
 });
 
 test("behavior: malformed JSON and non-object bodies fail closed before side effects", async () => {
@@ -305,7 +313,66 @@ test("behavior: malformed JSON and non-object bodies fail closed before side eff
     assert.equal(result.response.status, 400);
     assert.equal(result.body.error, "invalid_package");
   }
+  assert.deepEqual(harness.events, Array(5).fill("auth:valid-token"));
+  assert.equal(harness.orders.size, 0);
+  assert.equal(harness.providerRequests.length, 0);
+});
+
+test("behavior: authentication precedes media type and body parsing", async () => {
+  const harness = createHarness();
+  const baseHeaders = {
+    Origin: "https://app.example.com",
+    "Content-Type": "text/plain",
+    "Idempotency-Key": validKey
+  };
+  let request = new Request("https://functions.example.com/checkout", {
+    method: "POST",
+    headers: baseHeaders,
+    body: "{not-json"
+  });
+  let result = await responseBody(await harness.handler(request));
+  assert.equal(result.response.status, 401);
+  assert.equal(result.body.error, "authentication_required");
   assert.deepEqual(harness.events, []);
+
+  request = new Request("https://functions.example.com/checkout", {
+    method: "POST",
+    headers: { ...baseHeaders, Authorization: "Bearer expired" },
+    body: "{not-json"
+  });
+  result = await responseBody(await harness.handler(request));
+  assert.equal(result.response.status, 401);
+  assert.equal(result.body.error, "invalid_session");
+  assert.deepEqual(harness.events, ["auth:expired"]);
+});
+
+test("behavior: checkout accepts only application/json bodies up to 4096 bytes", async () => {
+  const harness = createHarness();
+  const headers = {
+    Origin: "https://app.example.com",
+    Authorization: "Bearer valid-token",
+    "Idempotency-Key": validKey
+  };
+  let request = new Request("https://functions.example.com/checkout", {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "text/plain" },
+    body: JSON.stringify({ packageCode: "analysis_pack_10" })
+  });
+  let result = await responseBody(await harness.handler(request));
+  assert.equal(result.response.status, 415);
+  assert.equal(result.body.error, "unsupported_media_type");
+
+  request = new Request("https://functions.example.com/checkout", {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ packageCode: "analysis_pack_10", padding: "x".repeat(4097) })
+  });
+  result = await responseBody(await harness.handler(request));
+  assert.equal(result.response.status, 413);
+  assert.equal(result.body.error, "request_too_large");
+  assert.deepEqual(harness.events, ["auth:valid-token", "auth:valid-token"]);
+  assert.equal(harness.orders.size, 0);
+  assert.equal(harness.providerRequests.length, 0);
 });
 
 test("behavior: unsupported methods and preflight bodies are side-effect free with bounded CORS", async () => {
@@ -334,6 +401,7 @@ test("behavior: injected financial fields cannot override the server-owned order
       amountCents: 1,
       credits: 999999,
       currency: "USD",
+      userId: "attacker-user",
       returnUrl: "https://evil.example/paid"
     }
   })));
@@ -343,6 +411,8 @@ test("behavior: injected financial fields cannot override the server-owned order
     [order.package_code, order.amount_cents, order.currency],
     ["analysis_pack_10", 490, "BRL"]
   );
+  assert.equal(harness.orders.has(`user-1:checkout:${validKey}`), true);
+  assert.equal(harness.orders.has(`attacker-user:checkout:${validKey}`), false);
   const payload = JSON.parse(harness.providerRequests[0].init.body);
   assert.equal(payload.items[0].unit_price, 4.9);
   assert.equal(new URL(payload.back_urls.success).origin, "https://app.example.com");
