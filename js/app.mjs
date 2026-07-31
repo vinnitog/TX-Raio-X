@@ -1,11 +1,9 @@
 import {
-  CHECKOUT_URL,
   CREDIT_PACK_PRICE,
   CREDIT_PACK_SIZE,
   FREE_ANALYSES,
   FREE_WALLET_HISTORY_LIMIT,
   isLocalTestEnvironment,
-  PAYMENT_VERIFICATION_URL,
   UNLOCKED_WALLET_HISTORY_LIMIT
 } from "./config.mjs";
 import { analyzeTransaction, createDemoAnalysis, isTransactionHash } from "./analyzer.mjs";
@@ -17,13 +15,19 @@ import {
 } from "./history-client.mjs";
 import {
   addCredits,
-  applyCreditGrant,
   consumeAnalysis,
   getFreeRemaining,
   getHistoryLimit,
   getRemaining,
   readUsage
 } from "./usage.mjs";
+import { CheckoutClientError, createCheckoutClient } from "./checkout-client.mjs";
+import {
+  createCheckoutLoadingController,
+  createRetryableLoader,
+  sanitizeCheckoutReturn
+} from "./checkout-flow.mjs";
+import { initAuthController } from "./auth-controller.mjs";
 
 const COPYABLE_DETAIL_LABELS = Object.freeze(["De", "Para", "Hash completo"]);
 const EVM_ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
@@ -109,6 +113,7 @@ const elements = {
   laterButton: document.querySelector("#dialog-later"),
   dialogUnlock: document.querySelector("#dialog-unlock-button"),
   priceUnlock: document.querySelector("#price-unlock-button"),
+  accountButton: document.querySelector("#account-button"),
   fieldHelpDialog: document.querySelector("#field-help-dialog"),
   fieldHelpClose: document.querySelector("#field-help-close"),
   fieldHelpConfirm: document.querySelector("#field-help-confirm"),
@@ -120,8 +125,17 @@ const elements = {
 let toastTimer;
 let analysisInProgress = false;
 let walletSearchInProgress = false;
+let authControllerPromise = null;
 let currentWalletHistory = null;
 const IS_LOCAL_DEMO = isLocalTestEnvironment(window.location.hostname);
+const checkoutLoading = createCheckoutLoadingController([
+  elements.priceUnlock,
+  elements.dialogUnlock
+]);
+const getCheckoutClient = createRetryableLoader(
+  () => import("./supabase-client.mjs"),
+  ({ supabase }) => createCheckoutClient(supabase)
+);
 
 function updateUsageLabel() {
   const usage = readUsage(localStorage);
@@ -173,11 +187,11 @@ function updatePurchaseAvailability() {
   elements.priceSection.hidden = readUsage(localStorage).unlocked;
 }
 
-function showToast(message) {
+function showToast(message, duration = 4200) {
   clearTimeout(toastTimer);
   elements.toast.textContent = message;
   elements.toast.classList.add("is-visible");
-  toastTimer = setTimeout(() => elements.toast.classList.remove("is-visible"), 4200);
+  toastTimer = setTimeout(() => elements.toast.classList.remove("is-visible"), duration);
 }
 
 function fallbackCopyText(text) {
@@ -298,7 +312,7 @@ function renderWalletHistory({
   if (transactions.length === 0) {
     const empty = document.createElement("p");
     empty.className = "wallet-empty";
-    empty.textContent = "Não encontramos transações normais indexadas. Isso não exclui transferências de tokens ou eventos internos; tente selecionar outra rede.";
+    empty.textContent = "Não encontramos transações normais indexadas. Isso não exclui transferências de tokens ou eventos internos.";
     elements.transactionList.replaceChildren(empty);
     if (moveFocus) {
       elements.walletResults.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -539,14 +553,9 @@ async function runAnalysis(hash, networkId, setPending, showError) {
   }
 }
 
-function activateCreditPack(message, grantId = null) {
-  let wasApplied = true;
+function activateCreditPack(message) {
   try {
-    if (grantId) {
-      ({ applied: wasApplied } = applyCreditGrant(localStorage, grantId, CREDIT_PACK_SIZE));
-    } else {
-      addCredits(localStorage, CREDIT_PACK_SIZE);
-    }
+    addCredits(localStorage, CREDIT_PACK_SIZE);
   } catch {
     showToast("Não foi possível salvar as análises neste navegador.");
     return false;
@@ -558,11 +567,24 @@ function activateCreditPack(message, grantId = null) {
   currentWalletHistory = null;
   elements.walletResults.hidden = true;
   elements.transactionList.replaceChildren();
-  showToast(wasApplied ? message : "Este pagamento já adicionou as análises.");
+  showToast(message);
   return true;
 }
 
-function beginCheckout() {
+function getCheckoutErrorMessage(error) {
+  if (!(error instanceof CheckoutClientError)) {
+    return "Não conseguimos abrir o checkout agora. Verifique sua conexão e tente novamente.";
+  }
+  if (["checkout_in_progress", "checkout_reconciliation_required"].includes(error.code)) {
+    return "Seu checkout ainda está sendo preparado. Aguarde alguns segundos e tente novamente.";
+  }
+  if (error.code === "origin_not_allowed") {
+    return "Este endereço ainda não está autorizado para iniciar compras.";
+  }
+  return "Não conseguimos abrir o checkout de teste agora. Tente novamente.";
+}
+
+async function beginCheckout() {
   if (readUsage(localStorage).unlocked) {
     showToast("Seu acesso legado já é ilimitado.");
     return;
@@ -573,54 +595,41 @@ function beginCheckout() {
     return;
   }
 
-  if (!CHECKOUT_URL) {
-    showToast("O link de pagamento ainda precisa ser configurado em js/config.mjs.");
-    return;
-  }
-  window.location.assign(CHECKOUT_URL);
-}
-
-async function applyPaymentReturn() {
-  const url = new URL(window.location.href);
-  const paymentId = url.searchParams.get("payment_id");
-  if (!paymentId) return;
-
-  if (IS_LOCAL_DEMO) {
-    url.searchParams.delete("payment_id");
-    window.history.replaceState({}, "", url);
-    return;
-  }
-
-  if (!PAYMENT_VERIFICATION_URL) {
-    showToast("O pagamento retornou, mas a validação segura ainda não foi configurada.");
-    return;
-  }
-
+  if (!checkoutLoading.tryStart()) return;
+  let redirectStarted = false;
   try {
-    const verificationUrl = new URL(PAYMENT_VERIFICATION_URL);
-    verificationUrl.searchParams.set("payment_id", paymentId);
-    const response = await fetch(verificationUrl, {
-      headers: { accept: "application/json" },
-      credentials: "omit"
-    });
-    if (!response.ok) throw new Error("Falha ao validar pagamento");
-    const verification = await response.json();
-    if (verification.approved !== true) {
-      showToast("O pagamento ainda não foi aprovado.");
+    const checkoutClient = await getCheckoutClient();
+    const checkout = await checkoutClient.start();
+    if (checkout.status === "auth_required") {
+      const authController = await authControllerPromise;
+      if (!authController?.open()) {
+        showToast("A conta está indisponível agora. Verifique sua conexão e tente novamente.");
+        return;
+      }
+      if (elements.paywall.open) elements.paywall.close();
+      showToast("Entre na sua conta e depois toque em Comprar novamente.");
       return;
     }
-
-    const activated = activateCreditPack(
-      `${CREDIT_PACK_SIZE} análises adicionadas. Busque novamente para ver até ${UNLOCKED_WALLET_HISTORY_LIMIT} transações.`,
-      paymentId
-    );
-    if (!activated) return;
-
-    url.searchParams.delete("payment_id");
-    window.history.replaceState({}, "", url);
-  } catch {
-    showToast("Não conseguimos validar o pagamento agora. Tente recarregar a página.");
+    redirectStarted = true;
+    window.location.assign(checkout.checkoutUrl);
+  } catch (error) {
+    showToast(getCheckoutErrorMessage(error));
+  } finally {
+    if (!redirectStarted) checkoutLoading.stop();
   }
+}
+
+function handleCheckoutReturn() {
+  const { status, cleanedUrl } = sanitizeCheckoutReturn(window.location.href);
+  if (!status) return;
+
+  const messages = {
+    success: "Você voltou do checkout de teste. Aguardando o webhook confirmar o pagamento antes de liberar o saldo.",
+    pending: "O pagamento de teste está pendente. Nenhuma análise foi liberada ainda.",
+    failure: "O pagamento de teste não foi concluído. Nenhuma análise foi liberada."
+  };
+  showToast(messages[status] ?? "Você voltou do checkout de teste.", 7000);
+  window.history.replaceState({}, "", cleanedUrl);
 }
 
 elements.form.addEventListener("submit", async (event) => {
@@ -718,6 +727,9 @@ elements.walletSort.addEventListener("change", () => {
 elements.demoButton.addEventListener("click", () => showResult(createDemoAnalysis(), true));
 elements.priceUnlock.addEventListener("click", beginCheckout);
 elements.dialogUnlock.addEventListener("click", beginCheckout);
+window.addEventListener("pageshow", () => {
+  checkoutLoading.restoreAfterPageShow();
+});
 elements.closeDialog.addEventListener("click", () => elements.paywall.close());
 elements.laterButton.addEventListener("click", () => elements.paywall.close());
 elements.paywall.addEventListener("click", (event) => {
@@ -751,8 +763,9 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-applyPaymentReturn();
+handleCheckoutReturn();
 updateConfiguredCopy();
 updateUsageLabel();
 updateWalletLimitLabel();
 updatePurchaseAvailability();
+authControllerPromise = initAuthController();

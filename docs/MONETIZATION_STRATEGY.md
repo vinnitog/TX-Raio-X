@@ -90,6 +90,57 @@ Primeira regra de decisão, definida antes de tráfego:
 
 Esses limiares são sinais iniciais, não evidência estatística definitiva.
 
+## Arquitetura financeira do teste
+
+Migration aplicada no projeto Supabase de desenvolvimento em 31 de julho de 2026;
+o histórico local/remoto coincide e o lint remoto do schema `public` foi aprovado.
+
+- Supabase Auth identifica a conta recuperável; a exclusão da conta anonimiza a
+  referência ao usuário sem remover os registros financeiros.
+- Ordens preservam o retrato do pacote comprado (10 créditos por R$ 4,90) e
+  pagamentos preservam apenas identificadores operacionais do Mercado Pago.
+- Créditos são derivados de um ledger append-only: compra soma, consumo e
+  reembolso subtraem. Webhooks repetidos não duplicam lançamentos graças a chaves
+  de idempotência únicas.
+- No beta, apenas reembolso integral ou chargeback reverte os 10 créditos do
+  pacote, uma única vez por pagamento. Reembolso parcial não altera o ledger de
+  créditos automaticamente; fica pendente para conciliação e tratamento manual
+  até existir uma política comercial e contábil específica.
+- Nenhuma tabela financeira armazena hash, carteira, payload bruto do provedor ou
+  dados pessoais. O navegador pode apenas consultar registros da própria conta;
+  toda escrita fica restrita ao backend com `service_role`.
+
+Hipótese: uma conta autenticada e um ledger server-side permitem restaurar o saldo
+em outro aparelho e tratar reembolsos sem concessão duplicada. A integração começa
+somente no ambiente de testes. Se a hipótese falhar, o checkout permanece
+desativado e a migration pode ser revertida antes de existir tráfego de produção,
+sem alterar preço, pacote ou gratuidade atuais.
+
+### Critérios do checkout em ambiente de teste
+
+- A única oferta aceita pelo backend é `analysis_pack_10`: 10 análises por
+  R$ 4,90. Código, quantidade, preço e moeda são definidos no servidor.
+- O checkout exige uma conta autenticada e cria a ordem financeira antes de criar
+  a preferência no Mercado Pago.
+- A chave de idempotência enviada pelo cliente identifica uma tentativa de compra;
+  repetições devolvem a preferência já associada e não criam uma nova ordem. Uma
+  tentativa concorrente pode receber `checkout_in_progress` enquanto a primeira é
+  conciliada; o cliente deve repetir a mesma chave.
+- O UUID da ordem é enviado como `external_reference`. URLs de retorno e webhook
+  vêm de secrets/configuração do ambiente, nunca do corpo da requisição.
+- A função entrega somente o `sandbox_init_point` enquanto
+  `MERCADO_PAGO_ENVIRONMENT=test`; habilitar produção exige uma alteração explícita
+  e uma nova revisão de segurança, taxas e margem.
+
+Hipótese de exequibilidade: uma preferência do Checkout Pro pode ser criada e
+recuperada sem duplicar ordens durante reenvios do navegador. Tentativas com
+resultado incerto entram em conciliação pelo `external_reference`; depois de cinco
+minutos sem preferência encontrada, uma nova tentativa pode adquirir o lease de
+recuperação. Validar com chamadas repetidas usando a mesma chave e confirmar uma
+única linha em `orders`. Se houver preferência órfã, duplicação ou divergência de
+valor/moeda, manter o checkout desativado, reconciliar o ambiente de teste e
+corrigir o fluxo antes do webhook.
+
 ## Próximas iterações
 
 1. Rodar apenas a oferta de R$ 4,90 para evitar dividir o pouco tráfego.

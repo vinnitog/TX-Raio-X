@@ -55,11 +55,54 @@ test("the installable entry point links the manifest and registers the service w
 test("service worker uses a versioned cache and includes wallet history code", () => {
   const serviceWorker = read("sw.js");
 
-  assert.match(serviceWorker, /const CACHE_NAME = ["']tx-raio-x-v36["'];/);
+  assert.match(serviceWorker, /const CACHE_NAME = ["']tx-raio-x-v41["'];/);
   assert.ok(
     appShellEntries().includes("./js/history-client.mjs"),
     "wallet history client should be cached for offline app startup"
   );
+});
+
+test("optional account UI exposes accessible Google, email and recovery flows", () => {
+  const index = read("index.html");
+  const app = read("js/app.mjs");
+  const controller = read("js/auth-controller.mjs");
+  const supabaseClient = read("js/supabase-client.mjs");
+  const serviceWorker = read("sw.js");
+
+  assert.match(index, /id=["']account-button["'][^>]*aria-label=["']Entrar ou criar conta["']/);
+  assert.match(index, /<dialog[^>]*id=["']auth-dialog["'][^>]*aria-label=["']Conta Tx Raio-X["']/);
+  assert.match(index, /id=["']auth-google-button["']/);
+  assert.match(index, /id=["']auth-email["'][^>]*aria-describedby=["']auth-feedback["']/);
+  assert.match(index, /id=["']recovery-password["'][^>]*aria-describedby=["']recovery-feedback["']/);
+  assert.match(index, /id=["']auth-form["']/);
+  assert.match(index, /id=["']recovery-form["']/);
+  assert.match(index, /id=["']auth-close["'][^>]*aria-label=["']Fechar["']/);
+  assert.match(app, /initAuthController\(\)/);
+  assert.match(controller, /signInWithPassword/);
+  assert.match(controller, /resetPassword/);
+  assert.match(controller, /updatePassword/);
+  assert.match(controller, /onAuthStateChange/);
+  assert.match(controller, /event === ["']PASSWORD_RECOVERY["']/);
+  assert.match(controller, /event\.target === elements\.dialog/);
+  assert.match(controller, /addEventListener\(["']cancel["'][\s\S]*?if \(busy\) event\.preventDefault\(\)/);
+  assert.match(controller, /event\.key !== ["']Tab["']/);
+  assert.match(controller, /compactEmail\(email\)/);
+  assert.match(controller, /runAuthRequest\([\s\S]*?elements\.googleButton/);
+  assert.match(controller, /runAuthRequest\([\s\S]*?elements\.submit/);
+  assert.match(controller, /finally \{\s*setBusy\(false\);/);
+  assert.match(supabaseClient, /@supabase\/supabase-js@2\.111\.0\/\+esm/);
+  assert.match(supabaseClient, /persistSession:\s*true/);
+  assert.match(supabaseClient, /flowType:\s*["']pkce["']/);
+  assert.doesNotMatch(serviceWorker, /cdn\.jsdelivr\.net/);
+
+  for (const module of [
+    "./js/auth-config.mjs",
+    "./js/auth-controller.mjs",
+    "./js/auth-service.mjs",
+    "./js/supabase-client.mjs"
+  ]) {
+    assert.ok(appShellEntries().includes(module), `${module} should be cached locally`);
+  }
 });
 
 test("every local module imported by the app entry point is available offline", () => {
@@ -116,17 +159,21 @@ test("wallet history analyzes the selected transaction without jumping to the ma
   );
 });
 
-test("wallet history requires one network and offers a custom ordering control", () => {
+test("wallet history offers all compatible networks and a custom ordering control", () => {
   const index = read("index.html");
   const walletSelect = index.match(
     /<select id="wallet-network"[\s\S]*?<\/select>/
   )?.[0];
 
   assert.ok(walletSelect, "wallet network select should exist");
-  assert.doesNotMatch(walletSelect, /value=["']auto["']/);
+  assert.match(
+    walletSelect,
+    /<option value=["']auto["']>Todas as redes compatíveis<\/option>/
+  );
   for (const network of ["ethereum", "base", "arbitrum", "polygon"]) {
     assert.match(walletSelect, new RegExp(`value=["']${network}["']`));
   }
+  assert.doesNotMatch(walletSelect, /value=["']bnb["']/);
   assert.match(index, /class=["']select-control/);
   assert.match(index, /id=["']wallet-sort["']/);
   assert.match(index, /value=["']desc["']/);
@@ -150,7 +197,7 @@ test("wallet history requires one network and offers a custom ordering control",
   assert.match(app, /walletPremiumLimitLabels/);
 });
 
-test("local demo enforces free usage and simulates a credit purchase without payment", () => {
+test("local demo simulates purchase while hosted checkout requires auth and never grants return credits", () => {
   const index = read("index.html");
   const app = read("js/app.mjs");
   const runAnalysis = app.slice(
@@ -163,15 +210,11 @@ test("local demo enforces free usage and simulates a credit purchase without pay
   );
   const beginCheckout = app.slice(
     app.indexOf("function beginCheckout("),
-    app.indexOf("async function applyPaymentReturn(")
+    app.indexOf("function handleCheckoutReturn(")
   );
-  const applyPaymentReturn = app.slice(
-    app.indexOf("async function applyPaymentReturn("),
+  const handleCheckoutReturn = app.slice(
+    app.indexOf("function handleCheckoutReturn("),
     app.indexOf('elements.form.addEventListener("submit"')
-  );
-  const localPaymentBranch = applyPaymentReturn.slice(
-    applyPaymentReturn.indexOf("if (IS_LOCAL_DEMO)"),
-    applyPaymentReturn.indexOf("if (!PAYMENT_VERIFICATION_URL)")
   );
   const walletSearchHandler = app.slice(
     app.indexOf('elements.walletForm.addEventListener("submit"'),
@@ -197,8 +240,11 @@ test("local demo enforces free usage and simulates a credit purchase without pay
     /catch \{[\s\S]*?return false;[\s\S]*?return true;/
   );
   assert.match(beginCheckout, /if \(IS_LOCAL_DEMO\)[\s\S]*?activateCreditPack\([\s\S]*?return;/);
-  assert.match(beginCheckout, /if \(!CHECKOUT_URL\)[\s\S]*?window\.location\.assign\(CHECKOUT_URL\)/);
-  assert.doesNotMatch(localPaymentBranch, /activateCreditPack|addCredits/);
+  assert.match(beginCheckout, /checkoutClient\.start\(\)/);
+  assert.match(beginCheckout, /checkout\.status === ["']auth_required["']/);
+  assert.match(beginCheckout, /authController\?\.open\(\)/);
+  assert.match(beginCheckout, /window\.location\.assign\(checkout\.checkoutUrl\)/);
+  assert.doesNotMatch(handleCheckoutReturn, /activateCreditPack|addCredits|applyCreditGrant/);
   assert.doesNotMatch(app, /priceSection\.hidden = true/);
   assert.match(app, /getRemaining\(usage,\s*FREE_ANALYSES\)/);
   assert.doesNotMatch(app, /getRemaining\(usage,\s*FREE_ANALYSES,\s*IS_LOCAL/);
@@ -208,24 +254,23 @@ test("local demo enforces free usage and simulates a credit purchase without pay
     app,
     /if \(IS_LOCAL_DEMO\) \{[\s\S]*?activateCreditPack\(`\$\{CREDIT_PACK_SIZE\} análises adicionadas · simulação local, sem pagamento\.`\);[\s\S]*?return;/
   );
-  assert.match(app, /function activateCreditPack\(message,\s*grantId = null\)[\s\S]*?addCredits\(localStorage,\s*CREDIT_PACK_SIZE\)/);
+  assert.match(app, /function activateCreditPack\(message\)[\s\S]*?addCredits\(localStorage,\s*CREDIT_PACK_SIZE\)/);
   assert.match(
     app,
-    /function activateCreditPack\(message,\s*grantId = null\)[\s\S]*?catch \{[\s\S]*?return false;[\s\S]*?return true;/
+    /function activateCreditPack\(message\)[\s\S]*?catch \{[\s\S]*?return false;[\s\S]*?return true;/
   );
-  assert.match(
-    app,
-    /const activated = activateCreditPack\([\s\S]*?paymentId[\s\S]*?if \(!activated\) return;[\s\S]*?searchParams\.delete\("payment_id"\)/
-  );
-  assert.match(app, /applyCreditGrant\(localStorage,\s*grantId,\s*CREDIT_PACK_SIZE\)/);
+  assert.match(app, /createCheckoutLoadingController\([\s\S]*?elements\.dialogUnlock/);
+  assert.match(app, /if \(!redirectStarted\) checkoutLoading\.stop\(\)/);
+  assert.match(app, /addEventListener\(["']pageshow["'][\s\S]*?restoreAfterPageShow\(\)/);
+  assert.match(app, /createRetryableLoader\([\s\S]*?import\(["']\.\/supabase-client\.mjs["']\)/);
+  assert.match(index, /class=["']checkout-loading-label["'][^>]*hidden>Abrindo checkout…/);
+  assert.match(handleCheckoutReturn, /sanitizeCheckoutReturn\(window\.location\.href\)/);
+  assert.match(handleCheckoutReturn, /webhook confirmar o pagamento/);
   assert.match(app, /if \(readUsage\(localStorage\)\.unlocked\)[\s\S]*?return;/);
   assert.match(app, /priceSection\.hidden = readUsage\(localStorage\)\.unlocked/);
   assert.match(app, /CREDIT_PACK_PRICE \/ CREDIT_PACK_SIZE/);
   assert.match(index, /data-credit-unit-price/);
-  assert.match(
-    app,
-    /if \(IS_LOCAL_DEMO\) \{[\s\S]*?url\.searchParams\.delete\("payment_id"\);[\s\S]*?return;/
-  );
+  assert.doesNotMatch(app, /CHECKOUT_URL|PAYMENT_VERIFICATION_URL/);
 });
 
 test("a new service worker takes control and refreshes an already controlled page once", () => {

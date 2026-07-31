@@ -109,6 +109,59 @@ footer {
   box-shadow: 0 0 0 4px rgb(183 243 107 / 10%);
 }
 
+.header-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* [UI] A conta permanece secundária ao produto e cabe no cabeçalho mobile. */
+.account-button {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.account-button:hover:not(:disabled),
+.account-button.is-authenticated {
+  border-color: rgb(114 215 245 / 55%);
+  background: rgb(114 215 245 / 10%);
+}
+
+.account-button:focus-visible {
+  outline: 3px solid rgb(114 215 245 / 70%);
+  outline-offset: 3px;
+}
+
+.account-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.account-button span:last-child {
+  overflow: hidden;
+  max-width: 150px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-icon {
+  color: var(--info);
+  font-size: 9px;
+}
+
 .hero {
   padding: 44px 0 48px;
   text-align: center;
@@ -1111,6 +1164,7 @@ footer {
   color: var(--text);
 }
 
+.auth-dialog,
 .paywall-dialog {
   width: min(calc(100% - 24px), 470px);
   max-height: calc(100vh - 24px);
@@ -1123,9 +1177,182 @@ footer {
   box-shadow: var(--shadow);
 }
 
+.auth-dialog::backdrop,
 .paywall-dialog::backdrop {
   background: rgb(2 7 14 / 78%);
   backdrop-filter: blur(5px);
+}
+
+.auth-dialog h2 {
+  margin: 8px 0;
+  font-size: 1.8rem;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+}
+
+.auth-subtitle,
+.auth-privacy-note {
+  color: var(--muted);
+}
+
+.auth-subtitle {
+  margin-bottom: 20px;
+}
+
+.google-button {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--text);
+  color: #17202b;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.google-button:disabled,
+.secondary-button:disabled,
+.auth-text-button:disabled,
+.dialog-close:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.google-button:hover {
+  background: #dfe8f1;
+}
+
+.google-button:focus-visible,
+.auth-text-button:focus-visible {
+  outline: 3px solid rgb(114 215 245 / 70%);
+  outline-offset: 3px;
+}
+
+.google-mark {
+  color: #4285f4;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  height: 1px;
+  flex: 1;
+  background: var(--border);
+  content: "";
+}
+
+.auth-form {
+  display: grid;
+  gap: 12px;
+}
+
+.auth-form .field {
+  gap: 6px;
+}
+
+.auth-form input {
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  font-family: inherit;
+}
+
+.auth-form input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgb(183 243 107 / 13%);
+}
+
+/* [UI] O Google continua como entrada visual principal; e-mail Ã© a alternativa. */
+#auth-submit {
+  border: 1px solid var(--border-strong);
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+#auth-submit:hover {
+  border-color: var(--info);
+  background: rgb(114 215 245 / 10%);
+}
+
+.auth-feedback {
+  min-height: 24px;
+  margin: 0;
+  color: var(--success);
+  font-size: 14px;
+}
+
+.auth-feedback.is-error {
+  color: var(--danger);
+}
+
+.auth-submit,
+.auth-logout {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.google-button.is-loading .button-spinner,
+.secondary-button.is-loading .button-spinner {
+  display: inline-block;
+}
+
+.google-button .button-spinner {
+  border-color: rgb(23 32 43 / 25%);
+  border-top-color: #17202b;
+}
+
+.secondary-button .button-spinner {
+  border-color: rgb(183 243 107 / 25%);
+  border-top-color: var(--primary);
+}
+
+.auth-text-button {
+  display: block;
+  min-height: 44px;
+  margin: 4px auto 0;
+  border: 0;
+  background: transparent;
+  color: var(--info);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.auth-switch {
+  color: var(--text);
+}
+
+.auth-privacy-note {
+  margin: 16px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  text-align: center;
+}
+
+.auth-account-email {
+  overflow-wrap: anywhere;
+  color: var(--info);
+  font-weight: 700;
 }
 
 .paywall-dialog h2 {
@@ -1298,12 +1525,32 @@ footer {
 }
 
 @media (max-width: 639px) {
+  .site-header {
+    gap: 8px;
+  }
+
+  .brand > span:last-child,
+  .usage-dot {
+    display: none;
+  }
+
+  .usage-pill {
+    padding-inline: 10px;
+  }
+
+  .account-button span:last-child {
+    max-width: 68px;
+  }
+
+  .auth-dialog,
   .paywall-dialog,
   .help-dialog {
     width: 100%;
     max-width: none;
     max-height: min(86vh, 700px);
+    max-height: min(86dvh, 700px);
     margin: auto 0 0;
+    padding-top: calc(28px + env(safe-area-inset-top));
     padding-bottom: calc(24px + env(safe-area-inset-bottom));
     border-radius: 20px 20px 0 0;
   }

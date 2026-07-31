@@ -1,11 +1,28 @@
 # Roadmap — Tx Raio-X
 
+## Progresso da infraestrutura de pagamento
+
+- [x] Projeto de desenvolvimento criado no Supabase.
+- [x] Cliente OAuth do Google criado para localhost, GitHub Pages e callback do Supabase.
+- [x] Integrar no app o login com Google, e-mail/senha, sessão, logout e recuperação de senha.
+- [ ] Concluir o teste manual ponta a ponta com Google, confirmação/recuperação por e-mail, recarga da sessão e logout.
+- [x] Criar e revisar localmente a migration de ordens, pagamentos e ledger.
+- [x] Autenticar/vincular o Supabase CLI e aplicar a migration no projeto de desenvolvimento.
+- [x] Criar a Edge Function de checkout bloqueada em modo de teste.
+- [x] Configurar a credencial de teste e publicar a Edge Function no projeto de desenvolvimento.
+- [x] Integrar o redirecionamento autenticado do PWA ao Checkout Pro de teste.
+- [ ] Executar e conferir a primeira ordem/preferência real no fluxo autenticado.
+- [ ] Implementar e validar o webhook idempotente do Mercado Pago.
+- [ ] Mover consumo pago para uma Edge Function transacional.
+- [ ] Validar pagamento, webhook repetido, reembolso integral e troca de aparelho.
+- [ ] Confirmar taxas e margem antes de habilitar credenciais de produção.
+
 ## Agora: validar o produto
 
 - Duas análises gratuitas por navegador.
 - Pacote cumulativo de 10 análises por R$ 4,90, sem assinatura.
 - Busca pública por hash ou endereço EVM.
-- Sem login, custódia ou conexão de carteira.
+- Conta opcional; sem custódia ou conexão de carteira.
 - Medir o funil definido em `docs/MONETIZATION_STRATEGY.md`.
 
 ## Próxima etapa: conta recuperável e acesso durável

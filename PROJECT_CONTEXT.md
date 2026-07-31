@@ -17,14 +17,14 @@ Brasileiros que usam criptomoedas e nao entendem dados tecnicos de exploradores 
 ## Caracteristicas Informadas
 
 - Interface visual: Sim
-- Login/autenticacao: Nao
-- Banco de dados: Nao
+- Login/autenticacao: Sim, opcional via Supabase Auth
+- Banco de dados: Sim, Supabase
 - Offline/PWA: Sim
 - Mobile: Sim
 - Dashboard/graficos: Nao
 - API propria: Nao
 - Integracoes externas: Sim
-- Multiusuario: Nao
+- Multiusuario: Sim, com conta opcional
 
 ## Stack Escolhida
 
@@ -83,7 +83,7 @@ git diff --check
 - A analise concluida e a metrica de valor cobrada; buscas de carteira continuam gratuitas.
 - Direitos legados do antigo beta ilimitado sao preservados, mas nao sao mais vendidos.
 - Paywall inicial deliberadamente simples, salvo no dispositivo.
-- Sem login, custodia, conexao de carteira ou recomendacao financeira.
+- Conta opcional via Google ou e-mail/senha; uso gratuito continua sem cadastro, custodia, conexao de carteira ou recomendacao financeira.
 - Redes iniciais: Ethereum, Base, Arbitrum, Polygon e BNB Chain.
 - Consultas por hash aceitam mais de um RPC por rede e so concluem ausencia quando todos os provedores configurados respondem sem encontrar a transacao.
 - O Raio-X confirmado tambem consulta bloco e altura atual para exibir data, numero de confirmacoes, gas, intencao decodificada, eventos de transferencia/autorizacao e detalhes tecnicos.
@@ -91,10 +91,10 @@ git diff --check
 - Valores de tokens obtidos sem metadados de contrato sao identificados honestamente como unidades minimas, sem presumir simbolo ou casas decimais.
 - Quando uma nova versao do service worker assume o controle de uma aba ja aberta, o app recarrega essa aba uma unica vez para aplicar os arquivos atualizados.
 - O motor deterministico produz os fatos; IA remota fica fora do primeiro MVP para evitar custo, segredo no cliente e alucinacoes.
-- Pagamento real depende da configuracao de um link em `js/config.mjs`.
+- O CTA de compra chama a Edge Function autenticada `checkout`; localhost preserva apenas a simulacao sem pagamento.
 - A busca por endereco publico nao consome analise gratis; apenas a analise do hash escolhido consome.
 - Historico inicial usa instancias publicas do Blockscout para Ethereum, Base, Arbitrum e Polygon.
-- A busca por carteira exige uma rede especifica: retorna as 3 transacoes normais mais recentes no acesso gratuito e ate 10 depois da primeira compra; o usuario pode inverter a ordem exibida.
+- A busca por carteira permite uma rede especifica ou todas as redes com historico compativel: reune, ordena e entao limita o resultado globalmente a 3 transacoes normais no acesso gratuito e ate 10 depois da primeira compra; o usuario pode inverter a ordem exibida.
 - Enquanto o entitlement estiver no localStorage, a regra 3/10 e segmentacao comercial experimental, nao controle antifraude.
 - A busca por endereco lista transacoes normais indexadas e nao deve ser apresentada como historico contabil completo.
 - A busca por carteira permanece em um painel recolhivel abaixo do analisador por hash.
@@ -102,5 +102,8 @@ git diff --check
 - Direcao de pagamento escolhida para producao: Mercado Pago Checkout Pro com Pix, mantendo validacao server-side.
 - A evolucao pos-validacao esta registrada em `ROADMAP.md`: conta recuperavel com Login com Google e alternativa de e-mail/senha.
 - O direito de acesso pago devera migrar do `localStorage` para um entitlement validado e persistido no servidor.
+- A migration inicial do Supabase para ordens, pagamentos e ledger foi aplicada no projeto de desenvolvimento com RLS, idempotencia e reversao integral; o lint remoto do schema public foi aprovado antes do checkout.
+- O PWA integra Supabase Auth com Google, e-mail/senha, sessão persistente, logout e recuperação de senha; compras e saldo ainda não estão associados à conta nesta etapa.
+- A Edge Function `checkout` cria uma ordem autenticada antes da preferência do Mercado Pago, aceita somente o pacote configurado e permanece bloqueada no ambiente de testes; o webhook ainda não concede créditos nesta etapa.
 - A estrategia comercial, hipoteses e criterios do experimento estao em `docs/MONETIZATION_STRATEGY.md`.
 - Mudancas futuras de preco, pacote, paywall ou checkout devem usar a skill local `tx-raio-x-monetization`.

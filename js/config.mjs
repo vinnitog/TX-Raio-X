@@ -8,11 +8,6 @@ export function isLocalTestEnvironment(hostname) {
   return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(hostname);
 }
 
-// Cole aqui o link criado no provedor de pagamento antes de publicar.
-// Configure o retorno aprovado para: https://seu-dominio/?payment_id=ID_DO_PAGAMENTO
-export const CHECKOUT_URL = "";
-export const PAYMENT_VERIFICATION_URL = "";
-
 export const NETWORKS = [
   {
     id: "ethereum",

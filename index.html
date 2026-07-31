@@ -16,9 +16,15 @@
         <span class="brand-mark" aria-hidden="true">TX</span>
         <span>Tx Raio-X</span>
       </a>
-      <div class="usage-pill" id="usage-pill" aria-live="polite">
-        <span class="usage-dot" aria-hidden="true"></span>
-        <span id="usage-text">2 análises grátis</span>
+      <div class="header-actions">
+        <div class="usage-pill" id="usage-pill" aria-live="polite">
+          <span class="usage-dot" aria-hidden="true"></span>
+          <span id="usage-text">2 análises grátis</span>
+        </div>
+        <button class="account-button" id="account-button" type="button" aria-label="Entrar ou criar conta" disabled>
+          <span class="account-icon" aria-hidden="true">●</span>
+          <span id="account-button-label">Conta</span>
+        </button>
       </div>
     </header>
 
@@ -100,7 +106,7 @@
             </div>
             <p class="wallet-panel-copy">
               Cole o endereço público da Rabby ou de outra carteira EVM. Buscaremos as
-              transações normais mais recentes na rede selecionada.
+              transações normais mais recentes na rede selecionada ou em todas as compatíveis.
             </p>
 
             <form id="wallet-form" novalidate>
@@ -131,6 +137,7 @@
                   <label for="wallet-network">Rede</label>
                   <div class="select-control">
                     <select id="wallet-network" name="walletNetwork">
+                      <option value="auto">Todas as redes compatíveis</option>
                       <option value="ethereum">Ethereum</option>
                       <option value="base">Base</option>
                       <option value="arbitrum">Arbitrum</option>
@@ -168,7 +175,7 @@
           </section>
 
         <div class="trust-list" aria-label="Características de segurança">
-          <span>Sem cadastro</span>
+          <span>Use sem cadastro</span>
           <span>Sem conexão de carteira</span>
           <span>Dados públicos da blockchain</span>
         </div>
@@ -234,8 +241,12 @@
           <span><span data-credit-pack-size>10</span> análises completas</span>
           <strong><small>R$</small> <span data-credit-pack-price>4,90</span></strong>
           <span class="price-benefit">R$ <span data-credit-unit-price>0,49</span> por Raio-X · até <span data-wallet-premium-limit>10</span> transações por busca</span>
-          <button class="primary-button" id="price-unlock-button" type="button">Comprar <span data-credit-pack-size>10</span> análises</button>
-          <small>Pagamento único · sem renovação automática · acesso local</small>
+          <button class="primary-button" id="price-unlock-button" type="button">
+            <span class="button-label">Comprar <span data-credit-pack-size>10</span> análises</span>
+            <span class="checkout-loading-label" hidden>Abrindo checkout…</span>
+            <span class="button-spinner" aria-hidden="true"></span>
+          </button>
+          <small>Pagamento único · sem renovação automática · compra vinculada à conta</small>
         </div>
       </section>
 
@@ -270,6 +281,76 @@
       </span>
     </footer>
 
+    <dialog class="auth-dialog" id="auth-dialog" aria-label="Conta Tx Raio-X">
+      <button class="dialog-close" id="auth-close" type="button" aria-label="Fechar">×</button>
+
+      <section id="auth-guest-view">
+        <p class="section-label">Conta opcional</p>
+        <h2 id="auth-title">Entre na sua conta</h2>
+        <p class="auth-subtitle" id="auth-subtitle">Acesse sua conta sem conectar nenhuma carteira.</p>
+
+        <button class="google-button" id="auth-google-button" type="button">
+          <span class="google-mark" aria-hidden="true">G</span>
+          <span class="button-label">Continuar com Google</span>
+          <span class="button-spinner" aria-hidden="true"></span>
+        </button>
+
+        <div class="auth-divider"><span>ou use seu e-mail</span></div>
+
+        <form class="auth-form" id="auth-form" novalidate>
+          <div class="field">
+            <label for="auth-email">E-mail</label>
+            <input id="auth-email" name="email" type="email" inputmode="email" autocomplete="email" aria-describedby="auth-feedback" required>
+          </div>
+          <div class="field">
+            <label for="auth-password">Senha</label>
+            <input id="auth-password" name="password" type="password" autocomplete="current-password" aria-describedby="auth-feedback" minlength="8" required>
+          </div>
+          <p class="auth-feedback" id="auth-feedback" role="status" aria-live="polite"></p>
+          <button class="primary-button auth-submit" id="auth-submit" type="submit">
+            <span id="auth-submit-label">Entrar com e-mail</span>
+            <span class="button-spinner" aria-hidden="true"></span>
+          </button>
+        </form>
+
+        <button class="auth-text-button" id="auth-forgot-password" type="button">Esqueci minha senha</button>
+        <button class="auth-text-button auth-switch" id="auth-switch-mode" type="button">Ainda não tem conta? Criar conta</button>
+        <p class="auth-privacy-note">A conta serve para recuperar futuras compras. Nunca pediremos sua chave ou frase-semente.</p>
+      </section>
+
+      <section id="auth-account-view" hidden>
+        <p class="section-label">Sua conta</p>
+        <h2>Conta conectada</h2>
+        <p class="auth-account-email" id="auth-account-email"></p>
+        <p class="auth-subtitle">Suas compras confirmadas serão associadas a esta conta para acesso em outros aparelhos.</p>
+        <button class="secondary-button auth-logout" id="auth-logout" type="button">
+          <span class="button-label">Sair da conta</span>
+          <span class="button-spinner" aria-hidden="true"></span>
+        </button>
+      </section>
+
+      <section id="auth-recovery-view" hidden>
+        <p class="section-label">Recuperar acesso</p>
+        <h2>Crie uma nova senha</h2>
+        <p class="auth-subtitle">Use pelo menos 8 caracteres.</p>
+        <form class="auth-form" id="recovery-form" novalidate>
+          <div class="field">
+            <label for="recovery-password">Nova senha</label>
+            <input id="recovery-password" type="password" autocomplete="new-password" aria-describedby="recovery-feedback" minlength="8" required>
+          </div>
+          <div class="field">
+            <label for="recovery-password-confirmation">Confirmar nova senha</label>
+            <input id="recovery-password-confirmation" type="password" autocomplete="new-password" aria-describedby="recovery-feedback" minlength="8" required>
+          </div>
+          <p class="auth-feedback" id="recovery-feedback" role="status" aria-live="polite"></p>
+          <button class="primary-button auth-submit" id="recovery-submit" type="submit">
+            <span class="button-label">Salvar nova senha</span>
+            <span class="button-spinner" aria-hidden="true"></span>
+          </button>
+        </form>
+      </section>
+    </dialog>
+
     <dialog class="paywall-dialog" id="paywall-dialog" aria-labelledby="paywall-title">
       <button class="dialog-close" id="dialog-close" type="button" aria-label="Fechar">×</button>
       <div class="dialog-icon" aria-hidden="true">0</div>
@@ -283,10 +364,12 @@
         <li>Sem conectar sua carteira</li>
       </ul>
       <p class="local-access-note">
-        O acesso é salvo localmente. Limpar os dados do navegador, trocar de navegador ou de aparelho pode removê-lo.
+        Entre na sua conta para vincular a compra. Ambiente de teste: as análises ainda não serão liberadas sem confirmação do webhook.
       </p>
       <button class="primary-button dialog-primary" id="dialog-unlock-button" type="button">
-        Comprar <span data-credit-pack-size>10</span> análises · R$ <span data-credit-pack-price>4,90</span>
+        <span class="button-label">Comprar <span data-credit-pack-size>10</span> análises · R$ <span data-credit-pack-price>4,90</span></span>
+        <span class="checkout-loading-label" hidden>Abrindo checkout…</span>
+        <span class="button-spinner" aria-hidden="true"></span>
       </button>
       <small class="dialog-payment-note">Pagamento único · análises sem validade durante o beta</small>
       <button class="dialog-later" id="dialog-later" type="button">Agora não</button>
