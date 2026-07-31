@@ -283,6 +283,71 @@ test("behavior: authentication and input are validated before database/provider 
   assert.deepEqual(harness.events, ["auth:expired"]);
 });
 
+test("behavior: malformed JSON and non-object bodies fail closed before side effects", async () => {
+  const harness = createHarness();
+  const headers = {
+    Origin: "https://app.example.com",
+    Authorization: "Bearer valid-token",
+    "Content-Type": "application/json",
+    "Idempotency-Key": validKey
+  };
+  const malformed = new Request("https://functions.example.com/checkout", {
+    method: "POST",
+    headers,
+    body: "{not-json"
+  });
+  let result = await responseBody(await harness.handler(malformed));
+  assert.equal(result.response.status, 400);
+  assert.equal(result.body.error, "invalid_package");
+
+  for (const body of [[], "analysis_pack_10", 490, true]) {
+    result = await responseBody(await harness.handler(checkoutRequest({ body })));
+    assert.equal(result.response.status, 400);
+    assert.equal(result.body.error, "invalid_package");
+  }
+  assert.deepEqual(harness.events, []);
+});
+
+test("behavior: unsupported methods and preflight bodies are side-effect free with bounded CORS", async () => {
+  const harness = createHarness();
+  let result = await responseBody(await harness.handler(checkoutRequest({ method: "PUT", body: null })));
+  assert.equal(result.response.status, 405);
+  assert.equal(result.body.error, "method_not_allowed");
+  assert.equal(result.response.headers.get("Access-Control-Allow-Origin"), "https://app.example.com");
+
+  const preflight = new Request("https://functions.example.com/checkout", {
+    method: "OPTIONS",
+    headers: { Origin: "https://app.example.com", "Content-Type": "text/plain" },
+    body: "unexpected"
+  });
+  const response = await harness.handler(preflight);
+  assert.equal(response.status, 204);
+  assert.equal(response.headers.get("Access-Control-Allow-Origin"), "https://app.example.com");
+  assert.deepEqual(harness.events, []);
+});
+
+test("behavior: injected financial fields cannot override the server-owned order snapshot", async () => {
+  const harness = createHarness();
+  const result = await responseBody(await harness.handler(checkoutRequest({
+    body: {
+      packageCode: "analysis_pack_10",
+      amountCents: 1,
+      credits: 999999,
+      currency: "USD",
+      returnUrl: "https://evil.example/paid"
+    }
+  })));
+  assert.equal(result.response.status, 201);
+  const order = [...harness.orders.values()][0];
+  assert.deepEqual(
+    [order.package_code, order.amount_cents, order.currency],
+    ["analysis_pack_10", 490, "BRL"]
+  );
+  const payload = JSON.parse(harness.providerRequests[0].init.body);
+  assert.equal(payload.items[0].unit_price, 4.9);
+  assert.equal(new URL(payload.back_urls.success).origin, "https://app.example.com");
+});
+
 test("behavior: order snapshot is persisted before preference creation and success", async () => {
   const harness = createHarness();
   const { response, body } = await responseBody(await harness.handler(checkoutRequest()));
