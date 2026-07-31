@@ -94,3 +94,25 @@ for (const status of ["success", "pending", "failure"]) {
     assert.deepEqual(usage, before);
   });
 }
+
+test("checkout return preserves Supabase auth parameters and fragment", async () => {
+  const { sanitizeCheckoutReturn } = await import("../js/checkout-flow.mjs");
+  const result = sanitizeCheckoutReturn(
+    "https://app.example.com/?checkout_status=success&payment_id=123&code=auth-code&type=recovery&next=%2Faccount#recovery"
+  );
+  const cleaned = new URL(result.cleanedUrl);
+
+  assert.equal(cleaned.searchParams.get("code"), "auth-code");
+  assert.equal(cleaned.searchParams.get("type"), "recovery");
+  assert.equal(cleaned.searchParams.get("next"), "/account");
+  assert.equal(cleaned.searchParams.has("payment_id"), false);
+  assert.equal(cleaned.hash, "#recovery");
+});
+
+test("ordinary auth return without checkout marker is left untouched", async () => {
+  const { sanitizeCheckoutReturn } = await import("../js/checkout-flow.mjs");
+  assert.deepEqual(
+    sanitizeCheckoutReturn("https://app.example.com/?code=auth-code&type=recovery#account"),
+    { status: null, cleanedUrl: null }
+  );
+});
