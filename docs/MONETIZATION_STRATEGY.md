@@ -175,6 +175,15 @@ Validação publicada: versão 2 da função `checkout`, ativa no projeto de tes
 hostil em 403, ausência de bearer em 401 `authentication_required` e bearer
 inválido em 401 `invalid_session`, sempre sem efeito financeiro.
 
+Correção CORS registrada após o smoke no navegador: `supabase.functions.invoke`
+envia também `x-client-info`. O preflight só é considerado aprovado quando
+`Access-Control-Allow-Headers` inclui esse header, além de `authorization`,
+`apikey`, `content-type` e `idempotency-key`; status 204 isolado não basta.
+Correção publicada no projeto de testes em 31/07/2026 e validada remotamente:
+origin `https://vinnitog.github.io` recebeu 204 com todos os headers esperados;
+origin semelhante e não autorizado recebeu 403 `origin_not_allowed` sem
+`Access-Control-Allow-Origin`.
+
 ## Próximas iterações
 
 1. Rodar apenas a oferta de R$ 4,90 para evitar dividir o pouco tráfego.
