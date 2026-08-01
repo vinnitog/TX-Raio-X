@@ -195,3 +195,43 @@ test("corrupted storage falls back to a clean usage state", async () => {
   });
   assert.equal(getRemaining(readUsage(storage), 2), 2);
 });
+
+test("usage summary shows paid balance beside the remaining free allowance", async () => {
+  const { formatUsageSummary } = await import("../js/usage.mjs");
+
+  assert.equal(formatUsageSummary({
+    freeRemaining: 2,
+    balance: 10,
+    balanceStatus: "ready"
+  }), "Saldo: 10 + 2 grátis");
+  assert.equal(formatUsageSummary({
+    freeRemaining: 1,
+    balance: 10,
+    balanceStatus: "ready"
+  }), "Saldo: 10 + 1 grátis");
+  assert.equal(formatUsageSummary({
+    freeRemaining: 0,
+    balance: 1,
+    balanceStatus: "ready"
+  }), "Saldo: 1 análise");
+});
+
+test("usage summary keeps loading, failure and legacy states informative", async () => {
+  const { formatUsageSummary } = await import("../js/usage.mjs");
+
+  assert.equal(formatUsageSummary({ freeRemaining: 2, balanceStatus: "loading" }), "2 grátis · carregando saldo…");
+  assert.equal(formatUsageSummary({ freeRemaining: 2, balanceStatus: "error" }), "2 grátis · saldo indisponível");
+  assert.equal(formatUsageSummary({ freeRemaining: 2, balanceStatus: "guest" }), "2 análises grátis");
+  assert.equal(formatUsageSummary({ freeRemaining: 0, balanceStatus: "ready" }), "Análises extras esgotadas");
+  assert.equal(formatUsageSummary({ freeRemaining: 0, unlocked: true }), "Acesso legado ilimitado");
+});
+
+test("local demo credits use the same combined usage summary", async () => {
+  const { formatUsageSummary } = await import("../js/usage.mjs");
+
+  assert.equal(formatUsageSummary({
+    freeRemaining: 2,
+    localCredits: 10,
+    localDemo: true
+  }), "Saldo: 10 + 2 grátis");
+});

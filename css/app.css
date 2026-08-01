@@ -99,6 +99,7 @@ footer {
   color: var(--muted);
   font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .usage-dot {
@@ -158,8 +159,14 @@ footer {
 }
 
 .account-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
   color: var(--info);
-  font-size: 9px;
 }
 
 .hero {
@@ -1029,7 +1036,7 @@ select:focus-visible {
 }
 
 .explanation-section {
-  max-width: 1000px;
+  width: 100%;
   margin: 32px auto 0;
   padding-top: 64px;
   border-top: 1px solid var(--border);
@@ -1355,23 +1362,6 @@ footer {
   font-weight: 700;
 }
 
-/* [UI] O saldo recuperado recebe destaque sem competir com o e-mail da conta. */
-.auth-account-balance {
-  margin: 12px 0;
-  padding: 12px 16px;
-  border: 1px solid rgb(183 243 107 / 35%);
-  border-radius: 10px;
-  background: rgb(183 243 107 / 8%);
-  color: var(--primary);
-  font-weight: 700;
-}
-
-.auth-account-balance.is-error {
-  border-color: rgb(255 107 107 / 35%);
-  background: rgb(255 107 107 / 8%);
-  color: var(--danger);
-}
-
 .paywall-dialog h2 {
   margin-bottom: 12px;
   font-size: 1.8rem;
@@ -1570,6 +1560,18 @@ footer {
     padding-top: calc(28px + env(safe-area-inset-top));
     padding-bottom: calc(24px + env(safe-area-inset-bottom));
     border-radius: 20px 20px 0 0;
+  }
+}
+
+@media (max-width: 400px) {
+  /* [UI] Mantém o resumo completo do saldo sem estourar o cabeçalho estreito. */
+  .usage-pill {
+    padding-inline: 8px;
+    font-size: 12px;
+  }
+
+  .account-button span:last-child {
+    display: none;
   }
 }
 

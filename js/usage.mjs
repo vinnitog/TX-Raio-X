@@ -96,3 +96,36 @@ export function getRemaining(usage, freeLimit, unlimited = false) {
 export function getHistoryLimit(usage, freeLimit, unlockedLimit) {
   return usage.paid || usage.unlocked ? unlockedLimit : freeLimit;
 }
+
+export function formatUsageSummary({
+  freeRemaining,
+  balance = 0,
+  balanceStatus = "guest",
+  localCredits = 0,
+  localDemo = false,
+  unlocked = false
+}) {
+  if (unlocked) return "Acesso legado ilimitado";
+
+  const paidBalance = localDemo
+    ? localCredits
+    : balanceStatus === "ready" ? balance : 0;
+  const freeLabel = `${freeRemaining} grátis`;
+
+  if (paidBalance > 0 && freeRemaining > 0) {
+    return `Saldo: ${paidBalance} + ${freeLabel}`;
+  }
+  if (paidBalance > 0) {
+    return `Saldo: ${paidBalance} ${paidBalance === 1 ? "análise" : "análises"}`;
+  }
+  if (!localDemo && balanceStatus === "loading") {
+    return freeRemaining > 0 ? `${freeLabel} · carregando saldo…` : "Carregando saldo…";
+  }
+  if (!localDemo && balanceStatus === "error") {
+    return freeRemaining > 0 ? `${freeLabel} · saldo indisponível` : "Saldo indisponível";
+  }
+  if (freeRemaining > 0) {
+    return `${freeRemaining} ${freeRemaining === 1 ? "análise grátis" : "análises grátis"}`;
+  }
+  return "Análises extras esgotadas";
+}
