@@ -261,6 +261,55 @@ aprovação repetida mantém um pagamento e um crédito; estados sem aprovação
 creditam; reembolso integral e chargeback não produzem saldo negativo quando a
 aprovação anterior não foi processada. Produção permanece bloqueada.
 
+### Saldo recuperável e consumo transacional
+
+Decisão registrada em 1º de agosto de 2026: manter a oferta de duas análises
+grátis por navegador e o pacote único de 10 análises por R$ 4,90. Depois das
+gratuitas, uma análise concluída por uma conta autenticada consome exatamente um
+crédito do ledger. O saldo pago pertence à conta, não ao navegador.
+
+Modelos avaliados:
+
+- manter créditos e consumo somente no `localStorage`: menor esforço, mas não
+  recupera compras em outro aparelho e permite adulteração; rejeitado;
+- permitir que o navegador insira consumos diretamente no ledger: recuperável,
+  porém expõe uma capacidade de escrita financeira desnecessária; rejeitado;
+- consultar o saldo com RLS e consumir por Edge Function + RPC transacional:
+  pequena latência adicional, mas preserva autoria, idempotência e auditoria;
+  escolhido para o teste;
+- mover também a consulta blockchain e a análise para o backend: controle mais
+  forte sobre a entrega, com maior custo e complexidade operacional; adiado até
+  existir evidência de abuso ou custo variável relevante.
+
+Hipóteses: o usuário entende que as duas análises locais são usadas antes do
+saldo da conta; o saldo aparece corretamente após login em outro aparelho; uma
+falha de rede não duplica o consumo; e serialização por conta impede dois
+consumos concorrentes quando resta somente um crédito. A análise paga só é
+exibida depois de o consumo ser confirmado. Compras ativas preservam o benefício
+de até 10 transações por busca, mesmo quando o saldo chega a zero; reembolso
+integral ou chargeback remove esse benefício se não houver outra compra ativa.
+Ao iniciar uma nova compra, o cliente só troca a chave idempotente anterior
+depois de confirmar pela própria RLS que a ordem daquela conta chegou a um estado
+terminal; falha de rede preserva a chave antiga e evita preferência duplicada.
+
+Eventos e critérios: `credit_balance_loaded`, `credit_consumed` e
+`credit_consumption_failed`, sem hash, carteira, e-mail ou payload financeiro.
+O incremento é aprovado somente com saldo restaurado em outra sessão, consumo
+`-1` único por identificador, rejeição sem saldo, isolamento entre contas e
+regressão completa aprovada. Se qualquer critério falhar, o consumo pago
+hospedado permanece bloqueado e o checkout continua restrito a testes; os
+créditos já comprados permanecem intactos no ledger.
+
+Limite de segurança conhecido: como o analisador e os provedores RPC continuam
+no JavaScript público da PWA, um cliente modificado pode executar a análise sem
+respeitar o paywall. Nesta etapa, a Edge Function protege a contabilidade e o
+fluxo oficial, não o código entregue ao navegador. O identificador de uma
+tentativa incerta é mantido no `sessionStorage` junto de um fingerprint local da
+operação, sem enviar ou persistir hash/rede no Supabase; troca de conta é
+rejeitada. Produção só pode considerar o paywall antifraude se a entrega paga
+migrar para backend ou se esse risco for explicitamente aceito após medir custo e
+abuso.
+
 1. Rodar apenas a oferta de R$ 4,90 para evitar dividir o pouco tráfego.
 2. Instrumentar o funil sem armazenar hash ou endereço de carteira.
 3. Integrar Mercado Pago e registrar créditos em ledger server-side idempotente.

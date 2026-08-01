@@ -29,8 +29,9 @@ function createStorage({ blocked = false } = {}) {
   };
 }
 
-function createSupabase({ userId = "user-1", invoke } = {}) {
+function createSupabase({ userId = "user-1", invoke, orderStatus = null, orderError = null } = {}) {
   const calls = [];
+  const orderChecks = [];
   return {
     client: {
       auth: {
@@ -52,9 +53,22 @@ function createSupabase({ userId = "user-1", invoke } = {}) {
             error: null
           };
         }
-      }
+      },
+      from: (table) => ({
+        select: () => ({
+          eq(field, value) {
+            orderChecks.push({ table, field, value });
+            return this;
+          },
+          maybeSingle: async () => ({
+            data: orderStatus ? { status: orderStatus } : null,
+            error: orderError
+          })
+        })
+      })
     },
-    calls
+    calls,
+    orderChecks
   };
 }
 
@@ -347,6 +361,45 @@ test("checkout accepts the Brazilian Mercado Pago sandbox host", async () => {
   }).start();
 
   assert.equal(result.checkoutUrl, "https://sandbox.mercadopago.com.br/checkout/pref-br");
+});
+
+test("every terminal checkout status rotates its key so the same account can repurchase", async () => {
+  const { createCheckoutClient } = await import("../js/checkout-client.mjs");
+  for (const orderStatus of [
+    "payment_approved", "payment_cancelled", "payment_charged_back",
+    "payment_refunded", "payment_rejected"
+  ]) {
+    const storage = createStorage();
+    storage.values.set(attemptsKey, JSON.stringify([
+      { userId: "user-1", idempotencyKey: idOne }
+    ]));
+    const supabase = createSupabase({ orderStatus });
+    await createCheckoutClient(supabase.client, { storage, createId: () => idTwo }).start();
+    assert.equal(supabase.calls[0].options.headers["Idempotency-Key"], idTwo, orderStatus);
+    assert.deepEqual(JSON.parse(storage.values.get(attemptsKey)), [
+      { userId: "user-1", idempotencyKey: idTwo }
+    ]);
+  }
+});
+
+test("unresolved or unavailable order state preserves the retry key", async () => {
+  const { createCheckoutClient } = await import("../js/checkout-client.mjs");
+  for (const options of [
+    { orderStatus: "checkout_ready" },
+    { orderStatus: "payment_pending" },
+    { orderError: new Error("offline") }
+  ]) {
+    const storage = createStorage();
+    storage.values.set(attemptsKey, JSON.stringify([
+      { userId: "user-1", idempotencyKey: idOne }
+    ]));
+    const supabase = createSupabase(options);
+    await createCheckoutClient(supabase.client, {
+      storage,
+      createId: () => assert.fail("unresolved key must be preserved")
+    }).start();
+    assert.equal(supabase.calls[0].options.headers["Idempotency-Key"], idOne);
+  }
 });
 
 test("blocked sessionStorage still reuses an in-memory attempt", async () => {

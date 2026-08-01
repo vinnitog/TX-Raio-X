@@ -322,7 +322,8 @@
         <p class="section-label">Sua conta</p>
         <h2>Conta conectada</h2>
         <p class="auth-account-email" id="auth-account-email"></p>
-        <p class="auth-subtitle">Suas compras confirmadas serão associadas a esta conta para acesso em outros aparelhos.</p>
+        <p class="auth-account-balance" id="auth-account-balance" aria-live="polite">Carregando saldo da conta…</p>
+        <p class="auth-subtitle">Compras confirmadas e saldo acompanham esta conta em outros aparelhos.</p>
         <button class="secondary-button auth-logout" id="auth-logout" type="button">
           <span class="button-label">Sair da conta</span>
           <span class="button-spinner" aria-hidden="true"></span>
@@ -364,7 +365,7 @@
         <li>Sem conectar sua carteira</li>
       </ul>
       <p class="local-access-note">
-        Entre na sua conta para vincular a compra. Ambiente de teste: as análises ainda não serão liberadas sem confirmação do webhook.
+        Entre na sua conta para vincular a compra. O saldo é liberado somente após a confirmação do webhook.
       </p>
       <button class="primary-button dialog-primary" id="dialog-unlock-button" type="button">
         <span class="button-label">Comprar <span data-credit-pack-size>10</span> análises · R$ <span data-credit-pack-price>4,90</span></span>

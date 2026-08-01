@@ -1,4 +1,4 @@
-const CACHE_NAME = "tx-raio-x-v44";
+const CACHE_NAME = "tx-raio-x-v45";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -14,6 +14,7 @@ const APP_SHELL = [
   "./js/chain-client.mjs",
   "./js/checkout-client.mjs",
   "./js/checkout-flow.mjs",
+  "./js/credit-client.mjs",
   "./js/config.mjs",
   "./js/history-client.mjs",
   "./js/usage.mjs",

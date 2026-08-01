@@ -48,7 +48,8 @@ async function loadAuthService() {
 export async function initAuthController({
   elements = getElements(),
   loadAuth = loadAuthService,
-  scheduleFrame = requestAnimationFrame
+  scheduleFrame = requestAnimationFrame,
+  onSessionChange = () => {}
 } = {}) {
   if (!elements.trigger || !elements.dialog) return;
 
@@ -115,6 +116,7 @@ export async function initAuthController({
       signedIn ? `Conta conectada: ${email}` : "Entrar ou criar conta"
     );
     elements.accountEmail.textContent = email;
+    Promise.resolve(onSessionChange(session)).catch(() => {});
   }
 
   function openDialog(view = "default") {

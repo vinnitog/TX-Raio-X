@@ -10,6 +10,9 @@ verify_jwt = false
 [functions.mercado-pago-webhook]
 verify_jwt = false
 
+[functions.consume-analysis]
+verify_jwt = false
+
 [api]
 enabled = true
 # Port to use for the API URL.
