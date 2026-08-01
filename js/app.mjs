@@ -16,6 +16,7 @@ import {
 import {
   addCredits,
   consumeAnalysis,
+  formatUsageSummary,
   getFreeRemaining,
   getHistoryLimit,
   readUsage
@@ -122,7 +123,6 @@ const elements = {
   dialogUnlock: document.querySelector("#dialog-unlock-button"),
   priceUnlock: document.querySelector("#price-unlock-button"),
   accountButton: document.querySelector("#account-button"),
-  accountBalance: document.querySelector("#auth-account-balance"),
   fieldHelpDialog: document.querySelector("#field-help-dialog"),
   fieldHelpClose: document.querySelector("#field-help-close"),
   fieldHelpConfirm: document.querySelector("#field-help-confirm"),
@@ -165,22 +165,14 @@ function hasPaidWalletAccess(usage = readUsage(localStorage)) {
 function updateUsageLabel() {
   const usage = readUsage(localStorage);
   const freeRemaining = getFreeRemaining(usage, FREE_ANALYSES);
-  if (usage.unlocked) {
-    elements.usageText.textContent = "Acesso legado ilimitado";
-  } else if (freeRemaining > 0) {
-    elements.usageText.textContent = `${freeRemaining} ${freeRemaining === 1 ? "análise grátis" : "análises grátis"}`;
-  } else if (IS_LOCAL_DEMO && usage.credits > 0) {
-    elements.usageText.textContent = `${usage.credits} ${usage.credits === 1 ? "análise disponível" : "análises disponíveis"}`;
-  } else if (accountEntitlement.status === "loading") {
-    elements.usageText.textContent = "Carregando saldo…";
-  } else if (accountEntitlement.status === "ready" && accountEntitlement.balance > 0) {
-    const balance = accountEntitlement.balance;
-    elements.usageText.textContent = `${balance} ${balance === 1 ? "análise disponível" : "análises disponíveis"}`;
-  } else if (accountEntitlement.status === "error") {
-    elements.usageText.textContent = "Saldo indisponível";
-  } else {
-    elements.usageText.textContent = "Análises extras esgotadas";
-  }
+  elements.usageText.textContent = formatUsageSummary({
+    freeRemaining,
+    balance: accountEntitlement.balance,
+    balanceStatus: accountEntitlement.status,
+    localCredits: usage.credits,
+    localDemo: IS_LOCAL_DEMO,
+    unlocked: usage.unlocked
+  });
 }
 
 function getWalletHistoryLimit() {
@@ -332,19 +324,6 @@ function getAnalyzeActionLabel() {
 }
 
 function renderAccountEntitlement() {
-  if (elements.accountBalance) {
-    elements.accountBalance.classList.toggle("is-error", accountEntitlement.status === "error");
-    if (accountEntitlement.status === "loading") {
-      elements.accountBalance.textContent = "Carregando saldo da conta…";
-    } else if (accountEntitlement.status === "ready") {
-      const balance = accountEntitlement.balance;
-      elements.accountBalance.textContent = `Saldo: ${balance} ${balance === 1 ? "análise" : "análises"}`;
-    } else if (accountEntitlement.status === "error") {
-      elements.accountBalance.textContent = "Saldo indisponível. Verifique sua conexão.";
-    } else {
-      elements.accountBalance.textContent = "";
-    }
-  }
   updateUsageLabel();
   updateWalletLimitLabel();
   updateTransactionActionLabels();

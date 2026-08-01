@@ -55,25 +55,27 @@ test("the installable entry point links the manifest and registers the service w
 test("service worker uses a versioned cache and includes wallet history code", () => {
   const serviceWorker = read("sw.js");
 
-  assert.match(serviceWorker, /const CACHE_NAME = ["']tx-raio-x-v45["'];/);
+  assert.match(serviceWorker, /const CACHE_NAME = ["']tx-raio-x-v46["'];/);
   assert.ok(
     appShellEntries().includes("./js/history-client.mjs"),
     "wallet history client should be cached for offline app startup"
   );
   assert.ok(
     appShellEntries().includes("./js/credit-client.mjs"),
-    "account credit client should be cached in service worker v45"
+    "account credit client should be cached in service worker v46"
   );
 });
 
 test("optional account UI exposes accessible Google, email and recovery flows", () => {
   const index = read("index.html");
   const app = read("js/app.mjs");
+  const css = read("css/app.css");
   const controller = read("js/auth-controller.mjs");
   const supabaseClient = read("js/supabase-client.mjs");
   const serviceWorker = read("sw.js");
 
   assert.match(index, /id=["']account-button["'][^>]*aria-label=["']Entrar ou criar conta["']/);
+  assert.match(index, /<svg class=["']account-icon["'][^>]*aria-hidden=["']true["'][^>]*focusable=["']false["']/);
   assert.match(index, /<dialog[^>]*id=["']auth-dialog["'][^>]*aria-label=["']Conta Tx Raio-X["']/);
   assert.match(index, /id=["']auth-google-button["']/);
   assert.match(index, /id=["']auth-email["'][^>]*aria-describedby=["']auth-feedback["']/);
@@ -82,7 +84,9 @@ test("optional account UI exposes accessible Google, email and recovery flows", 
   assert.match(index, /id=["']recovery-form["']/);
   assert.match(index, /id=["']auth-close["'][^>]*aria-label=["']Fechar["']/);
   assert.match(app, /initAuthController\(\{\s*onSessionChange:\s*refreshCreditEntitlement\s*\}\)/);
-  assert.match(index, /id=["']auth-account-balance["'][^>]*aria-live=["']polite["']/);
+  assert.match(index, /class=["'][^"']*\busage-pill\b[^"']*["'][^>]*id=["']usage-pill["'][^>]*aria-live=["']polite["']/);
+  assert.doesNotMatch(index, /id=["']auth-account-balance["']/);
+  assert.match(css, /@media \(max-width: 400px\)[\s\S]*?\.account-button span:last-child\s*\{[\s\S]*?display:\s*none/);
   assert.match(controller, /signInWithPassword/);
   assert.match(controller, /resetPassword/);
   assert.match(controller, /updatePassword/);
@@ -429,6 +433,8 @@ test("wallet search remains a visible collapsible alternative below the hash flo
   assert.match(css, /\.wallet-toggle\s*\{[\s\S]*?margin:\s*18px auto 0/);
   assert.match(css, /\.wallet-panel\s*\{[\s\S]*?margin:\s*18px auto 0/);
   assert.match(css, /\.explanation-section\s*\{[\s\S]*?margin:\s*32px auto 0/);
+  assert.match(css, /\.explanation-section\s*\{[\s\S]*?width:\s*100%/);
+  assert.doesNotMatch(css, /\.explanation-section\s*\{[\s\S]*?max-width:\s*1000px/);
   assert.match(css, /footer\s*\{[\s\S]*?margin-top:\s*32px/);
   assert.match(css, /@media \(min-width: 640px\)[\s\S]*?\.hero\s*\{[\s\S]*?padding:\s*40px 0 32px/);
 });

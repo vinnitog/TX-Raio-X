@@ -310,6 +310,20 @@ rejeitada. Produção só pode considerar o paywall antifraude se a entrega paga
 migrar para backend ou se esse risco for explicitamente aceito após medir custo e
 abuso.
 
+#### Visibilidade do saldo no cabeçalho
+
+Decisão registrada em 1º de agosto de 2026: manter preço, pacote, gratuidade e
+ordem de consumo inalterados, mas tornar o saldo recuperado visível sem exigir que
+o usuário abra a área da conta. Foram comparadas três apresentações: saldo apenas
+na modal da conta, um total único sem distinguir a origem e saldo pago acompanhado
+da franquia grátis restante. A terceira foi escolhida por comunicar imediatamente
+o valor comprado sem sugerir que créditos pagos e gratuitos tenham a mesma origem.
+
+Critério de aceitação: uma conta com 10 créditos e duas análises grátis deve ver
+`Saldo: 10 + 2 grátis` no cabeçalho; singular, saldo zero, carregamento e falha de
+rede devem continuar claros e não podem alterar nem consumir créditos. A modal da
+conta preserva apenas a informação de que compras e saldo acompanham a conta.
+
 1. Rodar apenas a oferta de R$ 4,90 para evitar dividir o pouco tráfego.
 2. Instrumentar o funil sem armazenar hash ou endereço de carteira.
 3. Integrar Mercado Pago e registrar créditos em ledger server-side idempotente.

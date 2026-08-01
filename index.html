@@ -22,7 +22,9 @@
           <span id="usage-text">2 análises grátis</span>
         </div>
         <button class="account-button" id="account-button" type="button" aria-label="Entrar ou criar conta" disabled>
-          <span class="account-icon" aria-hidden="true">●</span>
+          <svg class="account-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0" />
+          </svg>
           <span id="account-button-label">Conta</span>
         </button>
       </div>
@@ -322,7 +324,6 @@
         <p class="section-label">Sua conta</p>
         <h2>Conta conectada</h2>
         <p class="auth-account-email" id="auth-account-email"></p>
-        <p class="auth-account-balance" id="auth-account-balance" aria-live="polite">Carregando saldo da conta…</p>
         <p class="auth-subtitle">Compras confirmadas e saldo acompanham esta conta em outros aparelhos.</p>
         <button class="secondary-button auth-logout" id="auth-logout" type="button">
           <span class="button-label">Sair da conta</span>
