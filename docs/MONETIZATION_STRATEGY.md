@@ -213,6 +213,54 @@ confirmou preflight 204 com a allowlist esperada e POST sem sessão em 401
 
 ## Próximas iterações
 
+### Webhook de pagamento em ambiente de teste
+
+Decisão registrada em 31 de julho de 2026: o webhook é a única origem autorizada
+para transformar um pagamento em créditos. O retorno do navegador continua sendo
+apenas informativo e não altera ordem, pagamento ou ledger.
+
+- A notificação precisa ter assinatura HMAC válida do Mercado Pago antes de
+  qualquer consulta externa ou escrita no banco. O identificador assinado deve
+  coincidir com o corpo da notificação.
+- O probe vazio usado pelo painel para validar a URL recebe `200` apenas quando o
+  body é exatamente `{}`, não há query nem headers `x-signature`/`x-request-id`,
+  e termina sem consultar Mercado Pago ou banco. Toda requisição que contenha
+  sinais de notificação financeira continua exigindo validação e assinatura.
+- Depois da assinatura, a função consulta `/v1/payments/{id}` com o token do
+  vendedor e usa essa resposta como fonte de verdade. O pagamento deve ser de
+  teste, pertencer ao `collector_id` configurado e coincidir com a ordem em
+  `external_reference`, valor inteiro em centavos e moeda.
+- O `live_mode` esperado também é fixado no ambiente. A conta vendedora de teste
+  atual produz pagamentos com `live_mode=true`; aceitar esse valor não habilita
+  produção, pois o ambiente continua travado em `test` e o `collector_id` precisa
+  coincidir com a conta vendedora de teste configurada.
+- Uma função SQL `security definer`, executável somente por `service_role`, grava
+  pagamento, estado da ordem e ledger na mesma transação. Repetições e chamadas
+  concorrentes usam chaves únicas e não duplicam o crédito.
+- Cada `payment_id` aprovado representa dinheiro efetivamente recebido e concede
+  um pacote. Se uma preferência produzir dois pagamentos aprovados distintos,
+  ambos concedem 10 créditos; o reembolso de um deles reverte somente seu próprio
+  pacote. Repetir o mesmo `payment_id` continua sem duplicar saldo.
+- `approved` soma os 10 créditos exatamente uma vez. `pending`, `authorized`,
+  `in_process`, `in_mediation`, `rejected` e `cancelled` não alteram o ledger.
+  Reembolso integral ou `charged_back` reverte os 10 créditos uma única vez,
+  somente se o lançamento de compra existir. Reembolso parcial não altera o
+  ledger automaticamente e exige conciliação manual.
+- Payload bruto, e-mail, documento e dados do pagador não são persistidos nem
+  registrados em logs. Falhas expõem apenas códigos operacionais limitados.
+- O `ts` participa do HMAC, mas não recebe uma janela curta de expiração: o
+  Mercado Pago documenta reenvios após 15 minutos, 6 horas e até vários dias.
+  Replays válidos consultam novamente o recurso atual, cuja
+  `date_last_updated` impede regressão, e chegam a uma transação idempotente; uma
+  janela local de tempo descartaria reenvios legítimos sem ampliar a proteção
+  financeira. Limitação de volume fica para a camada de infraestrutura.
+
+Critérios do teste: assinatura inválida não chama Mercado Pago nem banco;
+pagamento com vendedor, ambiente, ordem, valor ou moeda divergentes é rejeitado;
+aprovação repetida mantém um pagamento e um crédito; estados sem aprovação não
+creditam; reembolso integral e chargeback não produzem saldo negativo quando a
+aprovação anterior não foi processada. Produção permanece bloqueada.
+
 1. Rodar apenas a oferta de R$ 4,90 para evitar dividir o pouco tráfego.
 2. Instrumentar o funil sem armazenar hash ou endereço de carteira.
 3. Integrar Mercado Pago e registrar créditos em ledger server-side idempotente.
