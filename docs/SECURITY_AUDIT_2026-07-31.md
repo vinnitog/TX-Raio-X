@@ -221,3 +221,29 @@ Atualizado em 31 de julho de 2026, após a auditoria inicial:
 Continuam bloqueadores: lifecycle server-side para encerrar tentativa e permitir
 recompra, rate limiting/limite de ordens ativas, timeout do Mercado Pago, webhook,
 ledger/consumo transacionais e hardening do deploy.
+
+### Atualização — saldo e consumo por conta (1º de agosto de 2026)
+
+- O webhook assinado e a RPC financeira transacional foram implementados e
+  validados em sandbox; repetição do mesmo pagamento não duplica crédito.
+- `get_credit_entitlement()` deriva saldo e benefício pago do ledger da própria
+  conta sob RLS. Reembolso integral e chargeback removem a compra ativa e o saldo
+  exibido nunca fica negativo.
+- `consume-analysis` autentica com `auth.getUser()`, aplica CORS exato, aceita
+  somente UUID v4 e chama uma RPC `security definer` restrita ao `service_role`.
+  A RPC serializa consumos por conta, impede consumo sem saldo e registra `-1`
+  idempotente no ledger append-only.
+- A conta responsável é congelada antes da consulta blockchain e revalidada no
+  débito. Uma resposta incerta reutiliza a tentativa persistida; se o navegador
+  bloquear o `sessionStorage`, a análise paga falha antes do consumo.
+- Ordens terminais liberam uma nova chave de checkout somente após consulta RLS;
+  ordens pendentes ou falhas de rede preservam a chave anterior.
+- Hash e rede não são enviados ao endpoint financeiro. Apenas um fingerprint da
+  operação fica temporariamente no `sessionStorage` para reconciliar o UUID.
+
+Limite residual e bloqueador de produção: `analyzer.mjs` e os clientes RPC são
+entregues publicamente pela PWA. Um cliente alterado pode executar esse código sem
+chamar o consumo, mesmo que o fluxo oficial esteja correto. Controle antifraude
+do paywall exige mover a entrega paga para backend ou aceitar formalmente o risco
+após medir abuso e custo. Também continuam pendentes rate limiting, timeout do
+Mercado Pago e hardening da hospedagem.

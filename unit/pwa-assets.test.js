@@ -55,10 +55,14 @@ test("the installable entry point links the manifest and registers the service w
 test("service worker uses a versioned cache and includes wallet history code", () => {
   const serviceWorker = read("sw.js");
 
-  assert.match(serviceWorker, /const CACHE_NAME = ["']tx-raio-x-v44["'];/);
+  assert.match(serviceWorker, /const CACHE_NAME = ["']tx-raio-x-v45["'];/);
   assert.ok(
     appShellEntries().includes("./js/history-client.mjs"),
     "wallet history client should be cached for offline app startup"
+  );
+  assert.ok(
+    appShellEntries().includes("./js/credit-client.mjs"),
+    "account credit client should be cached in service worker v45"
   );
 });
 
@@ -77,7 +81,8 @@ test("optional account UI exposes accessible Google, email and recovery flows", 
   assert.match(index, /id=["']auth-form["']/);
   assert.match(index, /id=["']recovery-form["']/);
   assert.match(index, /id=["']auth-close["'][^>]*aria-label=["']Fechar["']/);
-  assert.match(app, /initAuthController\(\)/);
+  assert.match(app, /initAuthController\(\{\s*onSessionChange:\s*refreshCreditEntitlement\s*\}\)/);
+  assert.match(index, /id=["']auth-account-balance["'][^>]*aria-live=["']polite["']/);
   assert.match(controller, /signInWithPassword/);
   assert.match(controller, /resetPassword/);
   assert.match(controller, /updatePassword/);
@@ -222,11 +227,16 @@ test("local demo simulates purchase while hosted checkout requires auth and neve
   );
 
   assert.match(app, /const IS_LOCAL_DEMO = isLocalTestEnvironment/);
-  assert.ok(runAnalysis.indexOf("getRemaining") < runAnalysis.indexOf("findTransaction"));
+  assert.ok(runAnalysis.indexOf("accountEntitlement.balance < 1") < runAnalysis.indexOf("findTransaction"));
   assert.match(
     runAnalysis,
-    /getRemaining\(usage,\s*FREE_ANALYSES\) === 0[\s\S]*?openPaywall\(\);[\s\S]*?return;[\s\S]*?findTransaction/
+    /requiresAccountCredit && accountEntitlement\.balance < 1[\s\S]*?openPaywall\(\);[\s\S]*?return;[\s\S]*?findTransaction/
   );
+  assert.ok(
+    runAnalysis.indexOf("const expectedCreditUserId") < runAnalysis.indexOf("findTransaction"),
+    "the paying account must be frozen before the blockchain request"
+  );
+  assert.match(runAnalysis, /findTransaction[\s\S]*?consume\(analysisId,\s*expectedCreditUserId\)[\s\S]*?showResult\(result\)/);
   assert.match(
     app,
     /demoButton\.addEventListener\("click", \(\) => showResult\(createDemoAnalysis\(\), true\)\)/
@@ -246,8 +256,7 @@ test("local demo simulates purchase while hosted checkout requires auth and neve
   assert.match(beginCheckout, /navigate:\s*\(tab, url\) => navigateToCheckout\(tab, url, window\.location\)/);
   assert.doesNotMatch(handleCheckoutReturn, /activateCreditPack|addCredits|applyCreditGrant/);
   assert.doesNotMatch(app, /priceSection\.hidden = true/);
-  assert.match(app, /getRemaining\(usage,\s*FREE_ANALYSES\)/);
-  assert.doesNotMatch(app, /getRemaining\(usage,\s*FREE_ANALYSES,\s*IS_LOCAL/);
+  assert.match(app, /getFreeRemaining\(usage,\s*FREE_ANALYSES\)/);
   assert.match(app, /consumeAnalysis\(localStorage,\s*FREE_ANALYSES\)/);
   assert.doesNotMatch(app, /consumeAnalysis\(localStorage,\s*IS_LOCAL/);
   assert.match(
@@ -268,6 +277,12 @@ test("local demo simulates purchase while hosted checkout requires auth and neve
   assert.match(index, /class=["']checkout-loading-label["'][^>]*hidden>Abrindo checkout…/);
   assert.match(handleCheckoutReturn, /sanitizeCheckoutReturn\(window\.location\.href\)/);
   assert.match(handleCheckoutReturn, /webhook confirmar o pagamento/);
+  const pollingDelays = [...handleCheckoutReturn.matchAll(/\b(\d{4,})\b/g)]
+    .map((match) => Number(match[1]));
+  assert.ok(
+    pollingDelays.some((delay) => delay > 6000),
+    "checkout return polling must continue beyond the initial six-second window"
+  );
   assert.match(app, /if \(readUsage\(localStorage\)\.unlocked\)[\s\S]*?return;/);
   assert.match(app, /priceSection\.hidden = readUsage\(localStorage\)\.unlocked/);
   assert.match(app, /CREDIT_PACK_PRICE \/ CREDIT_PACK_SIZE/);

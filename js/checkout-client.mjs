@@ -6,6 +6,13 @@ const TEST_CHECKOUT_HOSTS = new Set([
   "sandbox.mercadopago.com",
   "sandbox.mercadopago.com.br"
 ]);
+const RESOLVED_ORDER_STATUSES = new Set([
+  "payment_approved",
+  "payment_cancelled",
+  "payment_charged_back",
+  "payment_refunded",
+  "payment_rejected"
+]);
 
 export class CheckoutClientError extends Error {
   constructor(code = "checkout_unavailable") {
@@ -69,6 +76,31 @@ function readAttempt(storage, userId) {
   return null;
 }
 
+function removeAttempt(storage, userId) {
+  try {
+    const attempts = readAttempts(storage).filter((attempt) => attempt.userId !== userId);
+    storage?.setItem(CHECKOUT_ATTEMPTS_KEY, JSON.stringify(attempts));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function isAttemptResolved(client, userId, idempotencyKey) {
+  try {
+    const result = await client
+      .from("orders")
+      .select("status")
+      .eq("user_id", userId)
+      .eq("idempotency_key", `checkout:${idempotencyKey}`)
+      .maybeSingle();
+    if (result.error) return false;
+    return RESOLVED_ORDER_STATUSES.has(result.data?.status);
+  } catch {
+    return false;
+  }
+}
+
 async function getFunctionErrorCode(error) {
   try {
     const payload = await error?.context?.clone?.().json();
@@ -113,6 +145,11 @@ export function createCheckoutClient(client, {
       const userId = session.user.id;
       let idempotencyKey = readAttempt(storage, userId);
       if (!idempotencyKey) idempotencyKey = memoryAttempts.get(userId) ?? null;
+      if (idempotencyKey && await isAttemptResolved(client, userId, idempotencyKey)) {
+        memoryAttempts.delete(userId);
+        removeAttempt(storage, userId);
+        idempotencyKey = null;
+      }
       if (!idempotencyKey) {
         idempotencyKey = createId();
         if (!UUID_V4_PATTERN.test(idempotencyKey)) {
