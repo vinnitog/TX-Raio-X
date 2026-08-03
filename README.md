@@ -1,7 +1,7 @@
 # Tx Raio-X
 
 PWA que traduz transações EVM para português claro. O MVP oferece duas análises
-gratuitas por navegador/perfil e origem. Depois disso, o pacote inicial adiciona
+gratuitas, uma única vez por conta autenticada. Depois disso, o pacote inicial adiciona
 10 análises por R$ 4,90, sem assinatura.
 
 As próximas evoluções estão registradas em `ROADMAP.md` e a decisão comercial em
@@ -19,20 +19,20 @@ Acesse `http://localhost:4173`. Use **Ver exemplo — não usa análise grátis*
 interface sem consumir o limite.
 
 Em `localhost`, `127.0.0.1` e `::1`, o app simula o fluxo comercial completo:
-duas análises gratuitas, paywall e compra local de 10 créditos. O botão de compra
+duas análises gratuitas locais, paywall e compra local de 10 créditos. O botão de compra
 não inicia um pagamento real nesse ambiente.
 
 ## Autenticação
 
-O cabeçalho oferece uma conta opcional com Google ou e-mail e senha pelo Supabase
-Auth. Também estão disponíveis logout e recuperação de senha. As duas análises
-gratuitas continuam funcionando sem cadastro, e entrar não conecta nem associa uma
+O cabeçalho oferece uma conta com Google ou e-mail e senha pelo Supabase
+Auth. Também estão disponíveis logout e recuperação de senha. As análises reais
+exigem conta, enquanto o exemplo e a busca pública continuam sem conectar nem associar uma
 carteira à conta.
 
 O frontend usa somente a URL do projeto e a chave pública `publishable`. Segredos
 OAuth e chaves `service_role` permanecem no Supabase e nunca devem ser adicionados
-ao repositório. Nesta etapa, a sessão já é recuperável, mas o saldo pago ainda é
-local e só será vinculado à conta depois da Edge Function transacional.
+ao repositório. Franquia, saldo pago e consumo são derivados do ledger da conta
+e recuperados em outros navegadores ou aparelhos.
 
 ## Banco de desenvolvimento
 
@@ -82,7 +82,7 @@ que HTML e módulos JavaScript de versões diferentes permaneçam misturados.
 
 ## Pagamento
 
-O primeiro endpoint server-side é `supabase/functions/checkout`. Ele exige uma
+O endpoint `supabase/functions/checkout` exige uma
 sessão Supabase válida, recebe `POST { "packageCode": "analysis_pack_10" }` com um
 header `Idempotency-Key` em UUID v4, cria a ordem e só então cria uma preferência
 do Mercado Pago. Preço, quantidade de análises, moeda, retorno e webhook não são
@@ -108,7 +108,8 @@ supabase functions deploy checkout
 ```
 
 A função recusa qualquer ambiente diferente de `test` e retorna apenas o
-`sandbox_init_point`. O webhook ainda será implementado antes de conceder saldo;
+`sandbox_init_point`. O webhook assinado consulta o pagamento diretamente no
+Mercado Pago e concede ou reverte saldo por RPC transacional idempotente;
 parâmetros das URLs de retorno nunca aprovam uma compra.
 
 Fora de localhost, os CTAs carregam a sessão Supabase, pedem login quando
@@ -116,9 +117,16 @@ necessário e invocam a função com uma chave de idempotência por tentativa. O
 fica indisponível durante a criação para impedir cliques duplicados. O retorno do
 Checkout Pro apenas informa o estado do teste; não adiciona análises no navegador.
 
-A direção planejada para produção é Mercado Pago Checkout Pro com Pix. A
-confirmação do pagamento, o ledger transacional e a revisão de taxas/segurança
-continuam obrigatórios antes de habilitar produção.
+A produção permanece bloqueada até a configuração do CAPTCHA, revisão final de
+segredos/políticas/alertas, smoke manual completo e confirmação da tarifa efetiva.
+
+## Análise protegida
+
+No site hospedado, a consulta RPC e o motor determinístico executam na Edge
+Function `analyze-transaction`. Ela valida sessão, origem, rate limit e saldo, e
+só retorna o resultado depois que uma RPC transacional registra o consumo. O
+artefato do GitHub Pages é montado por lista permitida e não publica funções,
+migrations, testes ou o motor usado no backend.
 
 ## Testes
 

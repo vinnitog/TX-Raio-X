@@ -19,7 +19,10 @@ async function createHandler(overrides = {}) {
     },
     consumeCredit: async (userId, requestedId) => {
       calls.consume += 1;
-      return { consumed: true, applied: true, balance: 9, userId, requestedId };
+      return {
+        consumed: true, applied: true, balance: 10,
+        free_remaining: 1, source: "free", userId, requestedId
+      };
     },
     logger: { error() {} },
     ...overrides
@@ -118,23 +121,35 @@ test("a confirmed transaction returns the remaining account balance", async () =
     consumeCredit: async (userId, requestedId) => {
       calls.consume += 1;
       received = { userId, requestedId };
-      return { consumed: true, applied: true, balance: "9" };
+      return {
+        consumed: true, applied: true, balance: "10",
+        free_remaining: "1", source: "free"
+      };
     }
   });
   const response = await handler(request());
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { consumed: true, applied: true, balance: 9 });
+  assert.deepEqual(await response.json(), {
+    consumed: true, applied: true, balance: 10,
+    freeRemaining: 1, source: "free"
+  });
   assert.deepEqual(received, { userId: "user-1", requestedId: analysisId });
   assert.deepEqual(calls, { authenticate: 1, consume: 1 });
 });
 
 test("idempotent replay succeeds without claiming another application", async () => {
   const { handler } = await createHandler({
-    consumeCredit: async () => ({ consumed: true, applied: false, balance: 9 })
+    consumeCredit: async () => ({
+      consumed: true, applied: false, balance: 9,
+      free_remaining: 0, source: "paid"
+    })
   });
   const response = await handler(request());
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { consumed: true, applied: false, balance: 9 });
+  assert.deepEqual(await response.json(), {
+    consumed: true, applied: false, balance: 9,
+    freeRemaining: 0, source: "paid"
+  });
 });
 
 test("empty balance returns payment required and no financial details", async () => {
@@ -148,7 +163,14 @@ test("empty balance returns payment required and no financial details", async ()
 
 test("invalid database responses and thrown details become sanitized 500 errors", async () => {
   for (const consumeCredit of [
-    async () => ({ consumed: true, applied: true, balance: -1 }),
+    async () => ({
+      consumed: true, applied: true, balance: -1,
+      free_remaining: 0, source: "paid"
+    }),
+    async () => ({
+      consumed: true, applied: true, balance: 1,
+      free_remaining: -1, source: "free"
+    }),
     async () => { throw new Error("secret database payload"); }
   ]) {
     const { handler } = await createHandler({ consumeCredit });

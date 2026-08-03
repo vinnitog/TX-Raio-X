@@ -17,6 +17,8 @@ dist/
 build/
 out/
 coverage/
+playwright-report/
+test-results/
 .cache/
 .tmp/
 tmp/

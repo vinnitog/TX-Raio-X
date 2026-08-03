@@ -55,14 +55,14 @@ test("the installable entry point links the manifest and registers the service w
 test("service worker uses a versioned cache and includes wallet history code", () => {
   const serviceWorker = read("sw.js");
 
-  assert.match(serviceWorker, /const CACHE_NAME = ["']tx-raio-x-v46["'];/);
+  assert.match(serviceWorker, /const CACHE_NAME = ["']tx-raio-x-v47["'];/);
   assert.ok(
     appShellEntries().includes("./js/history-client.mjs"),
     "wallet history client should be cached for offline app startup"
   );
   assert.ok(
     appShellEntries().includes("./js/credit-client.mjs"),
-    "account credit client should be cached in service worker v46"
+    "account credit client should be cached in service worker v47"
   );
 });
 
@@ -206,7 +206,7 @@ test("wallet history offers all compatible networks and a custom ordering contro
   assert.match(app, /walletPremiumLimitLabels/);
 });
 
-test("local demo simulates purchase while hosted checkout requires auth and never grants return credits", () => {
+test("hosted analyses require account allowance while local demo keeps isolated simulation", () => {
   const index = read("index.html");
   const app = read("js/app.mjs");
   const runAnalysis = app.slice(
@@ -231,16 +231,28 @@ test("local demo simulates purchase while hosted checkout requires auth and neve
   );
 
   assert.match(app, /const IS_LOCAL_DEMO = isLocalTestEnvironment/);
-  assert.ok(runAnalysis.indexOf("accountEntitlement.balance < 1") < runAnalysis.indexOf("findTransaction"));
+  assert.ok(
+    runAnalysis.indexOf("accountEntitlement.freeRemaining + accountEntitlement.balance < 1") <
+      runAnalysis.indexOf(".analyze(hash, networkId, expectedCreditUserId)")
+  );
   assert.match(
     runAnalysis,
-    /requiresAccountCredit && accountEntitlement\.balance < 1[\s\S]*?openPaywall\(\);[\s\S]*?return;[\s\S]*?findTransaction/
+    /requiresHostedAccount && accountEntitlement\.status === "guest"[\s\S]*?authControllerPromise[\s\S]*?return;[\s\S]*?\.analyze\(hash, networkId, expectedCreditUserId\)/
+  );
+  assert.match(
+    runAnalysis,
+    /requiresServerAllowance[\s\S]*?accountEntitlement\.freeRemaining \+ accountEntitlement\.balance < 1[\s\S]*?openPaywall\(\);[\s\S]*?return;[\s\S]*?\.analyze\(hash, networkId, expectedCreditUserId\)/
   );
   assert.ok(
-    runAnalysis.indexOf("const expectedCreditUserId") < runAnalysis.indexOf("findTransaction"),
+    runAnalysis.indexOf("const expectedCreditUserId") <
+      runAnalysis.indexOf(".analyze(hash, networkId, expectedCreditUserId)"),
     "the paying account must be frozen before the blockchain request"
   );
-  assert.match(runAnalysis, /findTransaction[\s\S]*?consume\(analysisId,\s*expectedCreditUserId\)[\s\S]*?showResult\(result\)/);
+  assert.match(
+    runAnalysis,
+    /\.analyze\(hash, networkId, expectedCreditUserId\)[\s\S]*?protectedResult\.entitlement[\s\S]*?showResult\(result\)/
+  );
+  assert.doesNotMatch(app, /^import .*\/(?:chain-client|analyzer)\.mjs/m);
   assert.match(
     app,
     /demoButton\.addEventListener\("click", \(\) => showResult\(createDemoAnalysis\(\), true\)\)/
@@ -262,6 +274,11 @@ test("local demo simulates purchase while hosted checkout requires auth and neve
   assert.doesNotMatch(app, /priceSection\.hidden = true/);
   assert.match(app, /getFreeRemaining\(usage,\s*FREE_ANALYSES\)/);
   assert.match(app, /consumeAnalysis\(localStorage,\s*FREE_ANALYSES\)/);
+  assert.match(
+    runAnalysis,
+    /if \(IS_LOCAL_DEMO && !usage\.unlocked\)[\s\S]*?consumeAnalysis\(localStorage,\s*FREE_ANALYSES\)/
+  );
+  assert.match(app, /Entre para liberar 2 grátis/);
   assert.doesNotMatch(app, /consumeAnalysis\(localStorage,\s*IS_LOCAL/);
   assert.match(
     app,
@@ -287,8 +304,11 @@ test("local demo simulates purchase while hosted checkout requires auth and neve
     pollingDelays.some((delay) => delay > 6000),
     "checkout return polling must continue beyond the initial six-second window"
   );
-  assert.match(app, /if \(readUsage\(localStorage\)\.unlocked\)[\s\S]*?return;/);
-  assert.match(app, /priceSection\.hidden = readUsage\(localStorage\)\.unlocked/);
+  assert.match(app, /if \(IS_LOCAL_DEMO && readUsage\(localStorage\)\.unlocked\)[\s\S]*?return;/);
+  assert.match(
+    app,
+    /priceSection\.hidden = IS_LOCAL_DEMO && readUsage\(localStorage\)\.unlocked/
+  );
   assert.match(app, /CREDIT_PACK_PRICE \/ CREDIT_PACK_SIZE/);
   assert.match(index, /data-credit-unit-price/);
   assert.doesNotMatch(app, /CHECKOUT_URL|PAYMENT_VERIFICATION_URL/);
@@ -368,7 +388,7 @@ test("addresses and the full transaction hash expose accessible copy actions", (
 });
 
 test("every analyzer field has educational help and uses the reusable renderer", () => {
-  const analyzer = read("js/analyzer.mjs");
+  const analyzer = read("supabase/functions/_shared/transaction-analyzer.mjs");
   const app = read("js/app.mjs");
   const analyzerLabels = new Set(
     [...analyzer.matchAll(/\{\s*label:\s*"([^"]+)"/g)].map((match) => match[1])
@@ -393,7 +413,7 @@ test("every analyzer field has educational help and uses the reusable renderer",
 });
 
 test("detail spans collapse safely across mobile, tablet and desktop grids", () => {
-  const analyzer = read("js/analyzer.mjs");
+  const analyzer = read("supabase/functions/_shared/transaction-analyzer.mjs");
   const app = read("js/app.mjs");
   const css = read("css/app.css");
 

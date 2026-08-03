@@ -1,3 +1,5 @@
+import { createRequestTelemetry, getRequestId, withRequestId } from "./observability.mjs";
+
 const PAYMENT_ID_PATTERN = /^\d{1,32}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ACCEPTED_STATUSES = new Set([
@@ -198,8 +200,11 @@ export function validateMerchantOrder(merchantOrder, payment, order) {
   }
 }
 
-function jsonResponse(body, status) {
-  return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
+function jsonResponse(body, status, requestId) {
+  return Response.json(body, {
+    status,
+    headers: withRequestId({ "Cache-Control": "no-store" }, requestId)
+  });
 }
 
 export function createMercadoPagoWebhookHandler({
@@ -209,9 +214,14 @@ export function createMercadoPagoWebhookHandler({
   fetchMerchantOrder,
   loadOrder,
   processPayment,
-  logger = console
+  logger = console,
+  now = () => Date.now()
 }) {
   return async function handleMercadoPagoWebhook(request) {
+    const requestId = getRequestId(request);
+    const telemetry = createRequestTelemetry(
+      logger, "mercado_pago_webhook_request", requestId, now
+    );
     try {
       if (request.method !== "POST") {
         throw new WebhookHttpError(405, "method_not_allowed", "Use POST.");
@@ -241,18 +251,19 @@ export function createMercadoPagoWebhookHandler({
         && [...url.searchParams].length === 0
         && !request.headers.has("x-signature")
         && !request.headers.has("x-request-id")) {
-        return jsonResponse({ received: true, ignored: true, probe: true }, 200);
+        telemetry.ignored({ code: "url_probe", status: 200 });
+        return jsonResponse({ received: true, ignored: true, probe: true }, 200, requestId);
       }
       const bodyDataId = String(body?.data?.id ?? "");
       if (!PAYMENT_ID_PATTERN.test(dataId) || bodyDataId !== dataId) {
         throw new WebhookHttpError(400, "notification_id_mismatch", "Notification ID is invalid.");
       }
 
-      const requestId = request.headers.get("x-request-id") ?? "";
+      const providerRequestId = request.headers.get("x-request-id") ?? "";
       const signature = request.headers.get("x-signature") ?? "";
       const signatureIsValid = await verifySignature({
         dataId,
-        requestId,
+        requestId: providerRequestId,
         signature,
         secret: config.webhookSecret
       });
@@ -261,7 +272,8 @@ export function createMercadoPagoWebhookHandler({
       }
 
       if (body?.type !== "payment") {
-        return jsonResponse({ received: true, ignored: true }, 200);
+        telemetry.ignored({ code: "non_payment", status: 200 });
+        return jsonResponse({ received: true, ignored: true }, 200, requestId);
       }
 
       const payment = normalizePayment(
@@ -279,19 +291,21 @@ export function createMercadoPagoWebhookHandler({
       );
       const result = await processPayment(payment);
 
+      telemetry.success({
+        status: 200,
+        credited: Boolean(result?.credited),
+        reversed: Boolean(result?.reversed)
+      });
       return jsonResponse({
         received: true,
         credited: Boolean(result?.credited),
         reversed: Boolean(result?.reversed)
-      }, 200);
+      }, 200, requestId);
     } catch (error) {
       const status = error instanceof WebhookHttpError ? error.status : 500;
       const code = error instanceof WebhookHttpError ? error.code : "internal_error";
-      logger.error("mercado_pago_webhook_error", {
-        code,
-        message: String(error?.message ?? error).slice(0, 200)
-      });
-      return jsonResponse({ error: code }, status);
+      telemetry.error({ code, status });
+      return jsonResponse({ error: code }, status, requestId);
     }
   };
 }

@@ -8,7 +8,7 @@ PWA brasileira que traduz transacoes cripto em explicacoes claras e acionaveis
 
 ## Objetivo
 
-Permitir duas analises gratuitas por navegador/perfil e origem e vender pacotes de 10 analises por R$ 4,90, sem assinatura, custodia ou movimentacao de ativos
+Permitir duas análises gratuitas por conta verificada e vender pacotes de 10 análises por R$ 4,90, sem assinatura, custódia ou movimentação de ativos
 
 ## Publico Alvo
 
@@ -17,14 +17,14 @@ Brasileiros que usam criptomoedas e nao entendem dados tecnicos de exploradores 
 ## Caracteristicas Informadas
 
 - Interface visual: Sim
-- Login/autenticacao: Sim, opcional via Supabase Auth
+- Login/autenticacao: Sim, exigido para analises reais via Supabase Auth
 - Banco de dados: Sim, Supabase
 - Offline/PWA: Sim
 - Mobile: Sim
 - Dashboard/graficos: Nao
-- API propria: Nao
+- API propria: Sim, Supabase Edge Functions
 - Integracoes externas: Sim
-- Multiusuario: Sim, com conta opcional
+- Multiusuario: Sim, com conta obrigatoria para analises reais e compras
 
 ## Stack Escolhida
 
@@ -77,13 +77,13 @@ git diff --check
 ## Decisoes Do MVP
 
 - Nome de trabalho: Tx Raio-X.
-- Duas analises reais gratuitas por navegador/perfil e origem; no MVP, limpar ou trocar o navegador reinicia deliberadamente esse limite anonimo.
+- Duas análises reais gratuitas, concedidas uma única vez no backend por conta autenticada; limpar dados ou trocar de navegador não restaura a franquia.
 - Em localhost e enderecos de loopback, o modo de demonstracao aplica o limite real de duas analises e permite simular a compra de 10 creditos sem pagamento.
 - Modelo de cobranca: duas analises gratis e pacotes cumulativos de 10 analises por R$ 4,90, sem assinatura ou renovacao automatica.
 - A analise concluida e a metrica de valor cobrada; buscas de carteira continuam gratuitas.
 - Direitos legados do antigo beta ilimitado sao preservados, mas nao sao mais vendidos.
-- Paywall inicial deliberadamente simples, salvo no dispositivo.
-- Conta opcional via Google ou e-mail/senha; uso gratuito continua sem cadastro, custodia, conexao de carteira ou recomendacao financeira.
+- Paywall e consumo hospedados são validados no backend; o navegador não concede franquia nem saldo.
+- Conta via Google ou e-mail/senha é exigida para análises reais e recuperação de saldo; exemplo e busca pública continuam sem custódia, conexão de carteira ou recomendação financeira.
 - Redes iniciais: Ethereum, Base, Arbitrum, Polygon e BNB Chain.
 - Consultas por hash aceitam mais de um RPC por rede e so concluem ausencia quando todos os provedores configurados respondem sem encontrar a transacao.
 - O Raio-X confirmado tambem consulta bloco e altura atual para exibir data, numero de confirmacoes, gas, intencao decodificada, eventos de transferencia/autorizacao e detalhes tecnicos.
@@ -95,13 +95,13 @@ git diff --check
 - A busca por endereco publico nao consome analise gratis; apenas a analise do hash escolhido consome.
 - Historico inicial usa instancias publicas do Blockscout para Ethereum, Base, Arbitrum e Polygon.
 - A busca por carteira permite uma rede especifica ou todas as redes com historico compativel: reune, ordena e entao limita o resultado globalmente a 3 transacoes normais no acesso gratuito e ate 10 depois da primeira compra; o usuario pode inverter a ordem exibida.
-- Enquanto o entitlement estiver no localStorage, a regra 3/10 e segmentacao comercial experimental, nao controle antifraude.
+- A regra 3/10 da busca pública usa o entitlement da conta apenas como segmentacao comercial; a busca não consome saldo.
 - A busca por endereco lista transacoes normais indexadas e nao deve ser apresentada como historico contabil completo.
 - A busca por carteira permanece em um painel recolhivel abaixo do analisador por hash.
 - O bloco "Como funciona" permanece ao final da pagina, depois da area principal do produto.
 - Direcao de pagamento escolhida para producao: Mercado Pago Checkout Pro com Pix, mantendo validacao server-side.
 - A evolucao pos-validacao esta registrada em `ROADMAP.md`: conta recuperavel com Login com Google e alternativa de e-mail/senha.
-- O direito de acesso pago devera migrar do `localStorage` para um entitlement validado e persistido no servidor.
+- O direito de acesso pago e a franquia gratuita são persistidos no ledger e recuperados por conta.
 - A migration inicial do Supabase para ordens, pagamentos e ledger foi aplicada no projeto de desenvolvimento com RLS, idempotencia e reversao integral; o lint remoto do schema public foi aprovado antes do checkout.
 - O PWA integra Supabase Auth com Google, e-mail/senha, sessão persistente, logout e recuperação de senha; compras e saldo do ledger são recuperados pela conta autenticada, inclusive em outro navegador.
 - A Edge Function `checkout` cria uma ordem autenticada antes da preferência do Mercado Pago, aceita somente o pacote configurado e permanece bloqueada no ambiente de testes; naquela etapa inicial o webhook ainda não concedia créditos.
@@ -111,8 +111,8 @@ git diff --check
 - O primeiro pagamento aprovado no sandbox confirmou o redirecionamento; o checkout passa a abrir em nova aba com fallback seguro, limpa todos os parâmetros conhecidos do Mercado Pago no retorno e evita registrar como erro o conflito idempotente esperado ao recuperar a mesma ordem. A Edge Function refinada foi publicada e passou nos smokes remotos de CORS e autenticação; o retorno não concede créditos antes do webhook.
 - O webhook de teste do Mercado Pago valida a assinatura HMAC antes de qualquer efeito, consulta o pagamento pela API e confere ambiente, vendedor, ordem, valor e moeda. Uma RPC transacional restrita ao `service_role` atualiza pagamento e ordem e concede ou reverte o pacote no ledger com idempotência.
 - O probe vazio do painel do Mercado Pago é reconhecido sem efeitos financeiros; notificações reais continuam assinadas. O `live_mode` esperado é configurado explicitamente porque pagamentos da conta vendedora de teste atual são reportados como `true`, enquanto ambiente e collector permanecem fixados ao teste.
-- Depois das duas análises gratuitas locais, o frontend consulta o entitlement da conta com RLS e só exibe uma análise paga após a Edge Function `consume-analysis` confirmar uma entrada `consumption = -1`. A RPC serializa por conta, rejeita saldo insuficiente e é idempotente por UUID; tentativas incertas persistem no `sessionStorage`, troca de conta falha fechada e recompra só gira a chave após ordem terminal confirmada por RLS.
+- A franquia gratuita e o saldo pago são derivados do ledger da conta. A Edge Function `analyze-transaction` consulta e interpreta a transação no backend; a RPC de finalização consome primeiro `free_consumption` e depois `consumption`, com serialização e idempotência por UUID. Tentativas incertas preservam o mesmo identificador no `sessionStorage`, troca de conta falha fechada e recompra só gira a chave após ordem terminal confirmada por RLS.
 - O cabeçalho apresenta o saldo pago recuperado ao lado da franquia grátis restante, sem esconder a compra na modal da conta e sem somar as duas origens em um total ambíguo.
-- O analisador permanece JavaScript público e, portanto, um cliente modificado ainda pode ignorar o paywall. O consumo server-side protege a contabilidade e o fluxo oficial no teste, mas antifraude real continua bloqueador de produção até a entrega paga migrar ao backend ou o risco ser formalmente aceito.
+- O site publicado não inclui o motor de análise nem os clientes RPC da análise por hash. Um cliente modificado precisa chamar a Edge Function autenticada, que aplica rate limit, confere saldo e só entrega o resultado após a finalização transacional. Como o repositório-fonte é público e os dados blockchain também são públicos, isso protege o serviço oficial e sua contabilidade, mas não pretende tornar o algoritmo propriedade secreta.
 - A estrategia comercial, hipoteses e criterios do experimento estao em `docs/MONETIZATION_STRATEGY.md`.
 - Mudancas futuras de preco, pacote, paywall ou checkout devem usar a skill local `tx-raio-x-monetization`.

@@ -263,10 +263,10 @@ aprovação anterior não foi processada. Produção permanece bloqueada.
 
 ### Saldo recuperável e consumo transacional
 
-Decisão registrada em 1º de agosto de 2026: manter a oferta de duas análises
-grátis por navegador e o pacote único de 10 análises por R$ 4,90. Depois das
-gratuitas, uma análise concluída por uma conta autenticada consome exatamente um
-crédito do ledger. O saldo pago pertence à conta, não ao navegador.
+Decisão histórica registrada em 1º de agosto de 2026: naquele estágio, a oferta
+mantinha duas análises grátis por navegador e o pacote único de 10 análises por
+R$ 4,90. A gratuidade por navegador e a entrega no cliente foram substituídas
+pelas decisões de 2 de agosto descritas abaixo; preço e pacote não mudaram.
 
 Modelos avaliados:
 
@@ -278,10 +278,10 @@ Modelos avaliados:
   pequena latência adicional, mas preserva autoria, idempotência e auditoria;
   escolhido para o teste;
 - mover também a consulta blockchain e a análise para o backend: controle mais
-  forte sobre a entrega, com maior custo e complexidade operacional; adiado até
-  existir evidência de abuso ou custo variável relevante.
+  forte sobre a entrega, com maior custo e complexidade operacional; escolhido
+  em 2 de agosto como bloqueador de segurança para produção.
 
-Hipóteses: o usuário entende que as duas análises locais são usadas antes do
+Hipóteses históricas: o usuário entende que as duas análises gratuitas são usadas antes do
 saldo da conta; o saldo aparece corretamente após login em outro aparelho; uma
 falha de rede não duplica o consumo; e serialização por conta impede dois
 consumos concorrentes quando resta somente um crédito. A análise paga só é
@@ -300,15 +300,14 @@ regressão completa aprovada. Se qualquer critério falhar, o consumo pago
 hospedado permanece bloqueado e o checkout continua restrito a testes; os
 créditos já comprados permanecem intactos no ledger.
 
-Limite de segurança conhecido: como o analisador e os provedores RPC continuam
-no JavaScript público da PWA, um cliente modificado pode executar a análise sem
-respeitar o paywall. Nesta etapa, a Edge Function protege a contabilidade e o
-fluxo oficial, não o código entregue ao navegador. O identificador de uma
-tentativa incerta é mantido no `sessionStorage` junto de um fingerprint local da
-operação, sem enviar ou persistir hash/rede no Supabase; troca de conta é
-rejeitada. Produção só pode considerar o paywall antifraude se a entrega paga
-migrar para backend ou se esse risco for explicitamente aceito após medir custo e
-abuso.
+Esse limite foi encerrado em 2 de agosto: o site publicado não recebe o analisador
+nem os provedores RPC usados na análise por hash. A Edge Function autenticada
+consulta, interpreta e finaliza o consumo de forma transacional antes de devolver
+o resultado. O identificador de uma tentativa incerta é mantido no
+`sessionStorage` junto de um fingerprint local; o backend guarda somente o
+fingerprint SHA-256 para idempotência, sem persistir hash bruto, carteira ou
+resultado. O repositório-fonte e os dados blockchain são públicos, portanto a
+proteção impede bypass do serviço oficial, mas não depende de segredo do algoritmo.
 
 #### Visibilidade do saldo no cabeçalho
 
@@ -323,6 +322,76 @@ Critério de aceitação: uma conta com 10 créditos e duas análises grátis de
 `Saldo: 10 + 2 grátis` no cabeçalho; singular, saldo zero, carregamento e falha de
 rede devem continuar claros e não podem alterar nem consumir créditos. A modal da
 conta preserva apenas a informação de que compras e saldo acompanham a conta.
+
+### Gratuidade única por conta verificada
+
+Decisão registrada em 2 de agosto de 2026: retirar a franquia gratuita do
+`localStorage` no site hospedado e conceder duas análises, uma única vez, à conta
+autenticada. Uma análise Raio-X concluída continua sendo a unidade de valor; preço,
+pacote pago e ausência de assinatura não mudam.
+
+Modelos avaliados:
+
+- duas análises por navegador: menor fricção, mas limpar dados ou abrir perfis
+  permite gratuidade ilimitada; rejeitado;
+- duas análises por conta com e-mail verificado, concessão e consumo server-side,
+  CAPTCHA no cadastro e limites por conta/IP: mantém experimentação com abuso
+  limitado e auditável; escolhido para o beta;
+- exigir telefone ou instrumento de pagamento único: resistência maior a contas
+  múltiplas, porém aumenta custo, coleta de dados e abandono; adiado até fraude
+  mensurada justificar a fricção;
+- remover a gratuidade: reduz abuso, mas elimina a principal prova de valor antes
+  do checkout; rejeitado nesta fase.
+
+Não existe garantia de uma pessoa por e-mail. O objetivo operacional é limitar o
+custo do abuso, não prometer bloqueio perfeito. A defesa usa confirmação de e-mail,
+limites nativos do Supabase Auth, CAPTCHA quando as chaves do ambiente estiverem
+configuradas, limitação de análise por conta/IP e alertas de padrões anormais. Não
+será usado fingerprint oculto do dispositivo nem bloqueio indiscriminado de
+domínios. Telefone poderá ser testado somente após evidência de abuso relevante.
+
+Na migração, contas existentes recebem a concessão única de duas análises. Como o
+uso gratuito anterior ficou apenas no navegador e não pode ser reconciliado com
+segurança, essa concessão é um bônus de transição único; compras e consumos pagos
+permanecem intactos. Novas contas recebem a concessão idempotente no backend e não
+a recuperam ao limpar dados, trocar navegador ou reinstalar o PWA.
+
+Hipóteses e critérios: login não deve reduzir materialmente a conclusão da primeira
+análise; a mesma conta deve manter a franquia consumida em outro aparelho; chamadas
+concorrentes e repetidas não podem gerar mais de duas gratuitas; e criação anormal
+de contas deve aparecer na observabilidade sem armazenar hashes, carteiras ou IP
+bruto. Medir `signup_started`, `signup_verified`, `free_analysis_consumed`,
+`free_allowance_exhausted` e bloqueios por limite. Se a conversão verificada cair
+sem reduzir abuso, reavaliar a mensagem de login; se o custo abusivo permanecer
+relevante, testar verificação mais forte antes de alterar preço ou pacote.
+
+### Taxas e margem do pacote de R$ 4,90
+
+Revisão registrada em 2 de agosto de 2026 com base nas tarifas públicas do Mercado
+Pago para pagamentos online. Sobre R$ 4,90, antes de impostos, infraestrutura,
+reembolsos e chargebacks:
+
+| Meio/prazo | Tarifa divulgada | Custo estimado | Receita líquida do pagamento | Líquido por análise |
+| --- | ---: | ---: | ---: | ---: |
+| Pix, na hora | 0,99% | R$ 0,05 | R$ 4,85 | R$ 0,485 |
+| Cartão, 30 dias | 3,99% | R$ 0,20 | R$ 4,70 | R$ 0,470 |
+| Cartão, na hora/14 dias | 4,99% | R$ 0,24 | R$ 4,66 | R$ 0,466 |
+| Boleto, 3 dias | R$ 3,49 | R$ 3,49 | R$ 1,41 | R$ 0,141 |
+
+O pacote tem margem de pagamento entre 95,01% e 99,01% nos meios percentuais,
+mas boleto consumiria cerca de 71,2% do preço. Por isso o beta excluirá o tipo
+`ticket` e limitará cartão a uma parcela na preferência; saldo Mercado Pago, Pix,
+crédito e débito permanecem disponíveis. A validação de uma preferência recuperada
+também precisa conferir essas regras para não reabrir boleto ou parcelamento por
+engano.
+
+A margem de contribuição real ainda depende de impostos da empresa, plano/quota do
+Supabase, custo dos provedores RPC, suporte e perdas por fraude. Como o motor não usa
+IA paga, o teto conservador disponível para todos esses custos é R$ 4,65 por pacote
+no cenário de cartão mais caro. A produção permanece bloqueada até registrar o custo
+real por análise e manter reserva para reembolsos/chargebacks; a tarifa efetiva da
+conta deve ser conferida novamente em **Seu negócio > Custos > Checkouts** antes de
+publicar credenciais reais.
 
 1. Rodar apenas a oferta de R$ 4,90 para evitar dividir o pouco tráfego.
 2. Instrumentar o funil sem armazenar hash ou endereço de carteira.

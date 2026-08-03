@@ -5,38 +5,40 @@
 - [x] Projeto de desenvolvimento criado no Supabase.
 - [x] Cliente OAuth do Google criado para localhost, GitHub Pages e callback do Supabase.
 - [x] Integrar no app o login com Google, e-mail/senha, sessão, logout e recuperação de senha.
-- [ ] Concluir o teste manual ponta a ponta com Google, confirmação/recuperação por e-mail, recarga da sessão e logout.
+- [x] Concluir o teste manual ponta a ponta com Google, confirmação/recuperação por e-mail, recarga da sessão e logout.
 - [x] Criar e revisar localmente a migration de ordens, pagamentos e ledger.
 - [x] Autenticar/vincular o Supabase CLI e aplicar a migration no projeto de desenvolvimento.
 - [x] Criar a Edge Function de checkout bloqueada em modo de teste.
 - [x] Configurar a credencial de teste e publicar a Edge Function no projeto de desenvolvimento.
 - [x] Integrar o redirecionamento autenticado do PWA ao Checkout Pro de teste.
-- [ ] Executar e conferir a primeira ordem/preferência real no fluxo autenticado.
-- [ ] Implementar e validar o webhook idempotente do Mercado Pago.
-- [ ] Mover consumo pago para uma Edge Function transacional.
-- [ ] Validar pagamento, webhook repetido, reembolso integral e troca de aparelho.
-- [ ] Confirmar taxas e margem antes de habilitar credenciais de produção.
+- [x] Executar e conferir a primeira ordem/preferência real no fluxo autenticado.
+- [x] Implementar e validar o webhook idempotente do Mercado Pago.
+- [x] Mover consumo pago para uma Edge Function transacional.
+- [x] Cobrir pagamento, webhook repetido, reembolso integral, chargeback e troca de aparelho em testes automatizados; manter o smoke manual final antes da produção.
+- [x] Registrar taxas e margem do pacote e excluir boleto; reconfirmar a tarifa efetiva da conta antes da produção.
+- [x] Mover consulta e análise por hash para Edge Function protegida, com consumo transacional antes da entrega.
+- [ ] Configurar CAPTCHA/Turnstile após obter as chaves do domínio hospedado.
 
 ## Agora: validar o produto
 
-- Duas análises gratuitas por navegador.
+- Duas análises gratuitas, uma única vez por conta autenticada.
 - Pacote cumulativo de 10 análises por R$ 4,90, sem assinatura.
 - Busca pública por hash ou endereço EVM.
-- Conta opcional; sem custódia ou conexão de carteira.
+- Conta obrigatória para análises reais; exemplo e busca continuam públicos, sem custódia ou conexão de carteira.
 - Medir o funil definido em `docs/MONETIZATION_STRATEGY.md`.
 
-## Próxima etapa: conta recuperável e acesso durável
+## Entregue: conta recuperável e acesso durável
 
 ### Problema
 
-O saldo atual é salvo no `localStorage`. Usuários de cripto costumam limpar
-histórico, cookies e dados do navegador com frequência. Perder o acesso pago ao
-trocar de navegador, aparelho ou limpar dados reduz confiança e conversão.
+O saldo e a franquia são derivados do ledger da conta. O `localStorage` não é
+fonte de autoridade no site hospedado; compras e consumo sobrevivem à troca de
+navegador, aparelho e limpeza dos dados locais.
 
 ### Experiência desejada
 
-- Manter as duas análises gratuitas sem exigir cadastro.
-- Pedir uma conta somente quando o usuário decidir comprar um pacote.
+- Exigir conta para análises reais e manter exemplo e busca pública sem cadastro.
+- Pedir uma conta antes da primeira análise real ou da compra de um pacote.
 - Oferecer dois caminhos:
   1. **Continuar com Google** para contas Google/Gmail, usando OAuth/OpenID Connect.
   2. **Cadastrar outro e-mail** com formulário simples de e-mail e senha.
@@ -104,7 +106,7 @@ Na interface, chamar a unidade de **uso** ou **análise extra**. O termo técnic
 
 ### Oferta atual
 
-- Duas análises gratuitas para experimentar.
+- Duas análises gratuitas por conta para experimentar.
 - Pacote único de 10 usos por R$ 4,90 como primeira compra de baixo atrito.
 - Não vender ilimitado enquanto recursos futuros puderem gerar custo variável.
 - Depois de 10 compradores, testar 25 usos por R$ 9,90 em coortes separadas,

@@ -15,6 +15,16 @@ insert into public.orders (
   '50000000-0000-4000-8000-000000000001',
   'mercado_pago', 'test:credit:order:1', 'checkout_ready',
   'analysis_pack_10', 10, 490, 'BRL'
+), (
+  '60000000-0000-4000-8000-000000000002',
+  '50000000-0000-4000-8000-000000000001',
+  'mercado_pago', 'test:credit:order:2', 'checkout_ready',
+  'analysis_pack_10', 10, 490, 'BRL'
+), (
+  '60000000-0000-4000-8000-000000000003',
+  '50000000-0000-4000-8000-000000000001',
+  'mercado_pago', 'test:credit:order:3', 'checkout_ready',
+  'analysis_pack_10', 10, 490, 'BRL'
 );
 
 select * from public.process_mercado_pago_payment(
@@ -23,38 +33,56 @@ select * from public.process_mercado_pago_payment(
 );
 
 select extensions.results_eq(
-  $$select consumed, applied, balance from public.consume_analysis_credit(
+  $$select consumed, applied, balance, free_remaining, source from public.consume_analysis_credit(
     '50000000-0000-4000-8000-000000000001',
     '70000000-0000-4000-8000-000000000001'
   )$$,
-  $$values (true, true, 9::bigint)$$,
-  'first completed paid analysis consumes one credit'
+  $$values (true, true, 10::bigint, 1::bigint, 'free'::text)$$,
+  'first completed analysis consumes the account free allowance before paid balance'
 );
 
 select extensions.results_eq(
-  $$select consumed, applied, balance from public.consume_analysis_credit(
+  $$select consumed, applied, balance, free_remaining, source from public.consume_analysis_credit(
     '50000000-0000-4000-8000-000000000001',
     '70000000-0000-4000-8000-000000000001'
   )$$,
-  $$values (true, false, 9::bigint)$$,
+  $$values (true, false, 10::bigint, 1::bigint, 'free'::text)$$,
   'repeating the analysis identifier does not consume twice'
 );
 
 select extensions.results_eq(
-  $$select consumed, applied, balance from public.consume_analysis_credit(
+  $$select consumed, applied, balance, free_remaining, source from public.consume_analysis_credit(
     '50000000-0000-4000-8000-000000000002',
     '70000000-0000-4000-8000-000000000002'
   )$$,
-  $$values (false, false, 0::bigint)$$,
-  'another account cannot consume the purchaser balance'
+  $$values (true, true, 0::bigint, 1::bigint, 'free'::text)$$,
+  'another account receives only its own free allowance'
+);
+
+do $$
+begin
+  perform * from public.consume_analysis_credit(
+    '50000000-0000-4000-8000-000000000002',
+    '70000000-0000-4000-8000-000000000003'
+  );
+end;
+$$;
+
+select extensions.results_eq(
+  $$select consumed, applied, balance, free_remaining, source from public.consume_analysis_credit(
+    '50000000-0000-4000-8000-000000000002',
+    '70000000-0000-4000-8000-000000000004'
+  )$$,
+  $$values (false, false, 0::bigint, 0::bigint, null::text)$$,
+  'another account cannot consume the purchaser paid balance after its free allowance'
 );
 
 select extensions.is(
   (select count(*)::integer from public.credit_ledger
    where user_id = '50000000-0000-4000-8000-000000000001'
-     and entry_type = 'consumption'),
+     and entry_type = 'free_consumption'),
   1,
-  'ledger contains one append-only consumption entry'
+  'ledger contains one append-only free consumption entry for the purchaser'
 );
 
 select extensions.ok(
@@ -81,11 +109,25 @@ select extensions.ok(
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '50000000-0000-4000-8000-000000000001', true);
 select extensions.results_eq(
-  $$select balance, has_paid_access from public.get_credit_entitlement()$$,
-  $$values (9::bigint, true)$$,
+  $$select balance, free_remaining, has_paid_access from public.get_credit_entitlement()$$,
+  $$values (10::bigint, 1::bigint, true)$$,
   'authenticated account recovers its current balance and paid benefit'
 );
 reset role;
+
+-- Exhaust the remaining free grant, then consume one paid credit before reversal.
+select * from public.consume_analysis_credit(
+  '50000000-0000-4000-8000-000000000001',
+  '70000000-0000-4000-8000-000000000005'
+);
+select extensions.results_eq(
+  $$select consumed, applied, balance, free_remaining, source from public.consume_analysis_credit(
+    '50000000-0000-4000-8000-000000000001',
+    '70000000-0000-4000-8000-000000000006'
+  )$$,
+  $$values (true, true, 9::bigint, 0::bigint, 'paid'::text)$$,
+  'paid balance is consumed only after the free grant is exhausted'
+);
 
 select * from public.process_mercado_pago_payment(
   '60000000-0000-4000-8000-000000000001', '6001', 'refunded', null,
@@ -95,11 +137,52 @@ select * from public.process_mercado_pago_payment(
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '50000000-0000-4000-8000-000000000001', true);
 select extensions.results_eq(
-  $$select balance, has_paid_access from public.get_credit_entitlement()$$,
-  $$values (0::bigint, false)$$,
+  $$select balance, free_remaining, has_paid_access from public.get_credit_entitlement()$$,
+  $$values (0::bigint, 0::bigint, false)$$,
   'full refund clamps displayed balance and removes paid benefit'
 );
 reset role;
+
+-- Repurchase restores only the net paid balance after the prior consumption/refund.
+select * from public.process_mercado_pago_payment(
+  '60000000-0000-4000-8000-000000000002', '6002', 'approved', null,
+  490, 0, 'BRL', '2026-08-01T12:00:00Z', '2026-08-01T12:00:00Z'
+);
+select extensions.results_eq(
+  $$select balance, free_remaining, has_paid_access from public.get_service_credit_entitlement(
+    '50000000-0000-4000-8000-000000000001'
+  )$$,
+  $$values (9::bigint, 0::bigint, true)$$,
+  'repurchase restores nine net credits after one paid consumption and full refund'
+);
+
+select * from public.consume_analysis_credit(
+  '50000000-0000-4000-8000-000000000001',
+  '70000000-0000-4000-8000-000000000007'
+);
+select * from public.process_mercado_pago_payment(
+  '60000000-0000-4000-8000-000000000002', '6002', 'charged_back', null,
+  490, 490, 'BRL', '2026-08-01T12:00:00Z', '2026-08-01T13:00:00Z'
+);
+select extensions.results_eq(
+  $$select balance, free_remaining, has_paid_access from public.get_service_credit_entitlement(
+    '50000000-0000-4000-8000-000000000001'
+  )$$,
+  $$values (0::bigint, 0::bigint, false)$$,
+  'chargeback after consumption clamps the recoverable balance and removes paid access'
+);
+
+select * from public.process_mercado_pago_payment(
+  '60000000-0000-4000-8000-000000000003', '6003', 'approved', null,
+  490, 0, 'BRL', '2026-08-01T14:00:00Z', '2026-08-01T14:00:00Z'
+);
+select extensions.results_eq(
+  $$select balance, free_remaining, has_paid_access from public.get_service_credit_entitlement(
+    '50000000-0000-4000-8000-000000000001'
+  )$$,
+  $$values (8::bigint, 0::bigint, true)$$,
+  'a new purchase remains available after refund and chargeback history'
+);
 
 select * from extensions.finish();
 rollback;

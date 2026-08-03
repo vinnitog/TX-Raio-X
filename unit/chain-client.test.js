@@ -16,7 +16,7 @@ function rpcResponse(result) {
 }
 
 test("reports total RPC unavailability clearly", async () => {
-  const { findTransaction } = await import("../js/chain-client.mjs");
+  const { findTransaction } = await import("../supabase/functions/_shared/transaction-chain.mjs");
   global.fetch = async () => {
     throw new Error("network unavailable");
   };
@@ -28,7 +28,7 @@ test("reports total RPC unavailability clearly", async () => {
 });
 
 test("reports not found only when every RPC for the selected network returns null", async () => {
-  const { findTransaction } = await import("../js/chain-client.mjs");
+  const { findTransaction } = await import("../supabase/functions/_shared/transaction-chain.mjs");
   global.fetch = async (_url, options) => {
     const { method } = JSON.parse(options.body);
     assert.equal(method, "eth_getTransactionByHash");
@@ -42,7 +42,7 @@ test("reports not found only when every RPC for the selected network returns nul
 });
 
 test("does not report absence when one RPC returns null and another fails", async () => {
-  const { findTransaction } = await import("../js/chain-client.mjs");
+  const { findTransaction } = await import("../supabase/functions/_shared/transaction-chain.mjs");
   global.fetch = async (url) => {
     if (url === "https://cloudflare-eth.com") return rpcResponse(null);
     throw new Error("network unavailable");
@@ -55,7 +55,7 @@ test("does not report absence when one RPC returns null and another fails", asyn
 });
 
 test("falls back to the next Ethereum RPC after a null response", async () => {
-  const { findTransaction } = await import("../js/chain-client.mjs");
+  const { findTransaction } = await import("../supabase/functions/_shared/transaction-chain.mjs");
   const transaction = {
     hash: HASH,
     from: `0x${"1".repeat(40)}`,
@@ -95,7 +95,7 @@ test("falls back to the next Ethereum RPC after a null response", async () => {
 });
 
 test("uses a healthy RPC when another provider fails", async () => {
-  const { findTransaction } = await import("../js/chain-client.mjs");
+  const { findTransaction } = await import("../supabase/functions/_shared/transaction-chain.mjs");
   const transaction = {
     hash: HASH,
     from: `0x${"1".repeat(40)}`,
@@ -127,7 +127,7 @@ test("uses a healthy RPC when another provider fails", async () => {
 });
 
 test("tries another RPC when a provider has the transaction but not its receipt", async () => {
-  const { findTransaction } = await import("../js/chain-client.mjs");
+  const { findTransaction } = await import("../supabase/functions/_shared/transaction-chain.mjs");
   const transaction = {
     hash: HASH,
     from: `0x${"1".repeat(40)}`,
@@ -156,7 +156,7 @@ test("tries another RPC when a provider has the transaction but not its receipt"
 });
 
 test("returns a pending transaction when every RPC still has no receipt", async () => {
-  const { findTransaction } = await import("../js/chain-client.mjs");
+  const { findTransaction } = await import("../supabase/functions/_shared/transaction-chain.mjs");
   const transaction = {
     hash: HASH,
     from: `0x${"1".repeat(40)}`,
@@ -180,7 +180,7 @@ test("returns a pending transaction when every RPC still has no receipt", async 
 });
 
 test("enriches a confirmed transaction with its block and confirmation height", async () => {
-  const { findTransaction } = await import("../js/chain-client.mjs");
+  const { findTransaction } = await import("../supabase/functions/_shared/transaction-chain.mjs");
   const transaction = {
     hash: HASH,
     from: `0x${"1".repeat(40)}`,
@@ -215,7 +215,7 @@ test("enriches a confirmed transaction with its block and confirmation height", 
 });
 
 test("keeps valid block context when the latest height is temporarily unavailable", async () => {
-  const { findTransaction } = await import("../js/chain-client.mjs");
+  const { findTransaction } = await import("../supabase/functions/_shared/transaction-chain.mjs");
   const transaction = {
     hash: HASH,
     from: `0x${"1".repeat(40)}`,
@@ -250,7 +250,7 @@ test("keeps valid block context when the latest height is temporarily unavailabl
 });
 
 test("rejects block context that does not match the receipt block", async () => {
-  const { findTransaction } = await import("../js/chain-client.mjs");
+  const { findTransaction } = await import("../supabase/functions/_shared/transaction-chain.mjs");
   const transaction = {
     hash: HASH,
     from: `0x${"1".repeat(40)}`,
@@ -286,7 +286,7 @@ test("rejects block context that does not match the receipt block", async () => 
 });
 
 test("treats malformed JSON-RPC success payloads as inconclusive failures", async () => {
-  const { findTransaction } = await import("../js/chain-client.mjs");
+  const { findTransaction } = await import("../supabase/functions/_shared/transaction-chain.mjs");
   global.fetch = async () => ({
     ok: true,
     json: async () => ({ jsonrpc: "2.0", id: 1 })
@@ -299,7 +299,7 @@ test("treats malformed JSON-RPC success payloads as inconclusive failures", asyn
 });
 
 test("rejects JSON-RPC responses with a mismatched request id", async () => {
-  const { findTransaction } = await import("../js/chain-client.mjs");
+  const { findTransaction } = await import("../supabase/functions/_shared/transaction-chain.mjs");
   global.fetch = async () => ({
     ok: true,
     json: async () => ({ jsonrpc: "2.0", id: 2, result: null })
@@ -312,7 +312,7 @@ test("rejects JSON-RPC responses with a mismatched request id", async () => {
 });
 
 test("rejects transaction objects missing fields required by the analyzer", async () => {
-  const { findTransaction } = await import("../js/chain-client.mjs");
+  const { findTransaction } = await import("../supabase/functions/_shared/transaction-chain.mjs");
   global.fetch = async () => rpcResponse({ hash: HASH });
 
   await assert.rejects(
@@ -322,7 +322,7 @@ test("rejects transaction objects missing fields required by the analyzer", asyn
 });
 
 test("returns a transaction found on one network despite failures on others", async () => {
-  const { findTransaction } = await import("../js/chain-client.mjs");
+  const { findTransaction } = await import("../supabase/functions/_shared/transaction-chain.mjs");
   const transaction = {
     hash: HASH,
     from: `0x${"1".repeat(40)}`,
@@ -359,7 +359,7 @@ test("returns a transaction found on one network despite failures on others", as
 });
 
 test("automatic detection cancels slower networks after one network wins", async () => {
-  const { findTransaction } = await import("../js/chain-client.mjs");
+  const { findTransaction } = await import("../supabase/functions/_shared/transaction-chain.mjs");
   const transaction = {
     hash: HASH,
     from: `0x${"1".repeat(40)}`,

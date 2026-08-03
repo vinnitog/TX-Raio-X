@@ -67,6 +67,16 @@ Deno.serve(createCheckoutHandler({
     const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(token);
     return authError ? null : authData.user;
   },
+  enforceRateLimit: async (userId: string) => {
+    const { data, error } = await getSupabaseAdmin().rpc("enforce_account_rate_limit", {
+      p_user_id: userId,
+      p_scope: "checkout",
+      p_limit: 10,
+      p_window_seconds: 600
+    });
+    if (error) throw error;
+    return data === true;
+  },
   createOrGetOrder: (args) => createOrGetOrderRecord(getSupabaseAdmin(), args, ORDER_FIELDS),
   acquireRecoveryLease: async (order) => {
     const lease = await getSupabaseAdmin()

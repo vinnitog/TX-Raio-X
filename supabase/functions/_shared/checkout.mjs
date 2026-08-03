@@ -1,3 +1,5 @@
+import { createRequestTelemetry, getRequestId, withRequestId } from "./observability.mjs";
+
 export const CHECKOUT_OFFER = Object.freeze({
   code: "analysis_pack_10",
   credits: 10,
@@ -60,7 +62,12 @@ export function buildPreferencePayload(orderId, returnUrl, webhookUrl) {
     },
     auto_return: "approved",
     notification_url: webhookUrl,
-    statement_descriptor: "TXRAIOX"
+    statement_descriptor: "TXRAIOX",
+    payment_methods: {
+      excluded_payment_types: [{ id: "ticket" }],
+      installments: 1,
+      default_installments: 1
+    }
   };
 }
 
@@ -81,12 +88,18 @@ export function validatePreferenceSnapshot(preference, order) {
     ? preference.items.filter((item) => item?.id === order.package_code)
     : [];
   const item = matchingItems[0];
+  const excludedPaymentTypes = Array.isArray(preference?.payment_methods?.excluded_payment_types)
+    ? preference.payment_methods.excluded_payment_types
+    : [];
   const matches = preference?.external_reference === order.id
     && preference.items.length === 1
     && matchingItems.length === 1
     && Number(item?.quantity) === 1
     && item?.currency_id === order.currency
-    && Math.round(Number(item?.unit_price) * 100) === order.amount_cents;
+    && Math.round(Number(item?.unit_price) * 100) === order.amount_cents
+    && excludedPaymentTypes.some((type) => type?.id === "ticket")
+    && Number(preference?.payment_methods?.installments) === 1
+    && Number(preference?.payment_methods?.default_installments) === 1;
 
   if (!matches) throw new Error("Mercado Pago preference does not match its order.");
   return preference;
@@ -165,16 +178,17 @@ export async function createOrGetOrderRecord(
   return { order: existing.data, created: false };
 }
 
-function jsonResponse(body, status, corsHeaders) {
+function jsonResponse(body, status, corsHeaders, requestId) {
   return Response.json(body, {
     status,
-    headers: { ...corsHeaders, "Cache-Control": "no-store" }
+    headers: withRequestId({ ...corsHeaders, "Cache-Control": "no-store" }, requestId)
   });
 }
 
 export function createCheckoutHandler({
   loadConfig,
   authenticate,
+  enforceRateLimit = async () => true,
   createOrGetOrder,
   acquireRecoveryLease,
   markCreationStatus,
@@ -185,6 +199,8 @@ export function createCheckoutHandler({
 }) {
   return async function handleCheckout(request) {
     let corsHeaders = {};
+    const requestId = getRequestId(request);
+    const telemetry = createRequestTelemetry(logger, "checkout_request", requestId, now);
 
     try {
       const config = loadConfig();
@@ -197,7 +213,10 @@ export function createCheckoutHandler({
       if (origin && !allowedOrigins.has(origin)) {
         throw new CheckoutHttpError(403, "origin_not_allowed", "Origin is not allowed.");
       }
-      if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+      if (request.method === "OPTIONS") {
+        telemetry.ignored({ code: "preflight", status: 204 });
+        return new Response(null, { status: 204, headers: withRequestId(corsHeaders, requestId) });
+      }
       if (request.method !== "POST") {
         throw new CheckoutHttpError(405, "method_not_allowed", "Use POST.");
       }
@@ -211,6 +230,9 @@ export function createCheckoutHandler({
       const user = await authenticate(token);
       if (!user?.id) {
         throw new CheckoutHttpError(401, "invalid_session", "The authenticated session is invalid.");
+      }
+      if (!await enforceRateLimit(user.id)) {
+        throw new CheckoutHttpError(429, "rate_limited", "Too many checkout requests.");
       }
 
       const contentType = request.headers.get("Content-Type")?.split(";", 1)[0]?.trim().toLowerCase();
@@ -320,20 +342,19 @@ export function createCheckoutHandler({
         order = linkedOrder;
       }
 
+      const responseStatus = reused ? 200 : 201;
+      telemetry.success({ status: responseStatus, reused });
       return jsonResponse({
         orderId: order.id,
         checkoutUrl: getCheckoutUrl(preference, config.environment),
         reused,
         environment: config.environment
-      }, reused ? 200 : 201, corsHeaders);
+      }, responseStatus, corsHeaders, requestId);
     } catch (error) {
       const status = error instanceof CheckoutHttpError ? error.status : 500;
       const code = error instanceof CheckoutHttpError ? error.code : "internal_error";
-      logger.error("checkout_error", {
-        code,
-        message: String(error?.message ?? error).slice(0, 200)
-      });
-      return jsonResponse({ error: code }, status, corsHeaders);
+      telemetry.error({ code, status });
+      return jsonResponse({ error: code }, status, corsHeaders, requestId);
     }
   };
 }
