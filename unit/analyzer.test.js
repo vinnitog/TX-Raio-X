@@ -2,14 +2,14 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 test("validates an EVM transaction hash", async () => {
-  const { isTransactionHash } = await import("../js/analyzer.mjs");
+  const { isTransactionHash } = await import("../js/demo-analysis.mjs");
   assert.equal(isTransactionHash(`0x${"a".repeat(64)}`), true);
   assert.equal(isTransactionHash("0x1234"), false);
   assert.equal(isTransactionHash(`0x${"z".repeat(64)}`), false);
 });
 
 test("explains unlimited approvals and never claims funds moved", async () => {
-  const { createDemoAnalysis } = await import("../js/analyzer.mjs");
+  const { createDemoAnalysis } = await import("../js/demo-analysis.mjs");
   const result = createDemoAnalysis();
 
   assert.equal(result.title, "Uma autorização foi concedida");
@@ -18,7 +18,7 @@ test("explains unlimited approvals and never claims funds moved", async () => {
 });
 
 test("explains a failed transaction and its fee risk", async () => {
-  const { analyzeTransaction } = await import("../js/analyzer.mjs");
+  const { analyzeTransaction } = await import("../supabase/functions/_shared/transaction-analyzer.mjs");
   const result = analyzeTransaction({
     network: { name: "Base", nativeSymbol: "ETH", explorerUrl: "https://example.com/" },
     transaction: {
@@ -43,7 +43,7 @@ test("explains a failed transaction and its fee risk", async () => {
 });
 
 test("never claims a failed approval was granted", async () => {
-  const { analyzeTransaction } = await import("../js/analyzer.mjs");
+  const { analyzeTransaction } = await import("../supabase/functions/_shared/transaction-analyzer.mjs");
   const result = analyzeTransaction({
     network: { name: "Base", nativeSymbol: "ETH", explorerUrl: "https://example.com/" },
     transaction: {
@@ -68,7 +68,7 @@ test("never claims a failed approval was granted", async () => {
 });
 
 test("builds a detailed Raio-X with block context, calldata and receipt movements", async () => {
-  const { analyzeTransaction } = await import("../js/analyzer.mjs");
+  const { analyzeTransaction } = await import("../supabase/functions/_shared/transaction-analyzer.mjs");
   const owner = `0x${"1".repeat(40)}`;
   const spender = `0x${"2".repeat(40)}`;
   const token = `0x${"3".repeat(40)}`;
@@ -117,7 +117,7 @@ test("builds a detailed Raio-X with block context, calldata and receipt movement
 });
 
 test("describes an ERC-721 approval by token id instead of a fungible amount", async () => {
-  const { analyzeTransaction } = await import("../js/analyzer.mjs");
+  const { analyzeTransaction } = await import("../supabase/functions/_shared/transaction-analyzer.mjs");
   const owner = `0x${"1".repeat(40)}`;
   const approved = `0x${"2".repeat(40)}`;
   const token = `0x${"3".repeat(40)}`;
@@ -161,7 +161,7 @@ test("describes an ERC-721 approval by token id instead of a fungible amount", a
 });
 
 test("does not expose a negative confirmation count from inconsistent heights", async () => {
-  const { analyzeTransaction } = await import("../js/analyzer.mjs");
+  const { analyzeTransaction } = await import("../supabase/functions/_shared/transaction-analyzer.mjs");
   const result = analyzeTransaction({
     network: { name: "Ethereum", nativeSymbol: "ETH", explorerUrl: "https://example.com/" },
     transaction: {

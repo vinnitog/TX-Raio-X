@@ -27,7 +27,7 @@ function createClient({ userId = "user-1", rpc, invoke } = {}) {
       rpc: async (name) => {
         calls.push({ type: "rpc", name });
         return rpc ? rpc(name) : {
-          data: [{ balance: "10", has_paid_access: true }],
+          data: [{ balance: "10", free_remaining: "2", has_paid_access: true }],
           error: null
         };
       },
@@ -35,7 +35,10 @@ function createClient({ userId = "user-1", rpc, invoke } = {}) {
         invoke: async (name, options) => {
           calls.push({ type: "function", name, options });
           return invoke ? invoke(name, options) : {
-            data: { consumed: true, applied: true, balance: 9 },
+            data: {
+              consumed: true, applied: true, balance: 10,
+              freeRemaining: 1, source: "free"
+            },
             error: null
           };
         }
@@ -52,6 +55,7 @@ test("credit balance belongs to the authenticated Supabase account", async () =>
   assert.deepEqual(entitlement, {
     userId: "account-a",
     balance: 10,
+    freeRemaining: 2,
     hasPaidAccess: true
   });
   assert.deepEqual(mock.calls, [{ type: "rpc", name: "get_credit_entitlement" }]);
@@ -77,7 +81,12 @@ test("consumption sends only a generated UUID and validates the response", async
   });
 
   assert.equal(client.prepareAnalysis("user-1", fingerprint), analysisId);
-  assert.deepEqual(await client.consume(analysisId, "user-1"), { balance: 9, applied: true });
+  assert.deepEqual(await client.consume(analysisId, "user-1"), {
+    balance: 10,
+    freeRemaining: 1,
+    source: "free",
+    applied: true
+  });
   assert.deepEqual(mock.calls[0], {
     type: "function",
     name: "consume-analysis",
@@ -109,12 +118,20 @@ test("uncertain consumption retries once with the same analysis identifier", asy
       assert.deepEqual(options, { body: { analysisId } });
       return attempts === 1
         ? { data: null, error: new TypeError("response lost") }
-        : { data: { consumed: true, applied: false, balance: 9 }, error: null };
+        : {
+            data: {
+              consumed: true, applied: false, balance: 9,
+              freeRemaining: 0, source: "paid"
+            },
+            error: null
+          };
     }
   });
 
   assert.deepEqual(await createCreditClient(mock.client).consume(analysisId, "user-1"), {
     balance: 9,
+    freeRemaining: 0,
+    source: "paid",
     applied: false
   });
   assert.equal(attempts, 2);
@@ -147,7 +164,9 @@ test("two uncertain responses remain pending and the same analysis is recovered 
 test("malformed balances and identifiers fail closed", async () => {
   const { CreditClientError, createCreditClient } = await import("../js/credit-client.mjs");
   const malformed = createClient({
-    rpc: async () => ({ data: [{ balance: -1, has_paid_access: true }], error: null })
+    rpc: async () => ({
+      data: [{ balance: -1, free_remaining: 2, has_paid_access: true }], error: null
+    })
   });
   await assert.rejects(createCreditClient(malformed.client).getEntitlement(), {
     code: "invalid_entitlement_response"
@@ -204,13 +223,19 @@ test("account switch after the balance query still cannot invoke consumption for
       })
     },
     rpc: async () => ({
-      data: [{ balance: "10", has_paid_access: true }],
+      data: [{ balance: "10", free_remaining: "2", has_paid_access: true }],
       error: null
     }),
     functions: {
       invoke: async () => {
         invokeCalls += 1;
-        return { data: { consumed: true, applied: true, balance: 9 }, error: null };
+        return {
+          data: {
+            consumed: true, applied: true, balance: 10,
+            freeRemaining: 1, source: "free"
+          },
+          error: null
+        };
       }
     }
   });
@@ -247,4 +272,60 @@ test("analysis fingerprint is deterministic without persisting the transaction h
   assert.equal(first, second);
   assert.match(first, /^[0-9a-f]{64}$/);
   assert.notEqual(first, hash.slice(2));
+});
+
+test("protected analysis sends only id, hash and network then clears the pending attempt", async () => {
+  const { createCreditClient } = await import("../js/credit-client.mjs");
+  const { createDemoAnalysis } = await import("../js/demo-analysis.mjs");
+  const transactionHash = `0x${"b".repeat(64)}`;
+  const storage = createStorage();
+  const mock = createClient({
+    invoke: async (name) => {
+      assert.equal(name, "analyze-transaction");
+      return {
+        data: {
+          analysis: createDemoAnalysis(),
+          consumption: { source: "free", applied: true },
+          entitlement: { balance: 0, freeRemaining: 1 }
+        },
+        error: null
+      };
+    }
+  });
+  const client = createCreditClient(mock.client, { createId: () => analysisId, storage });
+  const result = await client.analyze(transactionHash, "base", "user-1");
+
+  assert.equal(result.analysis.title, "Uma autorização foi concedida");
+  assert.deepEqual(result.entitlement, { balance: 0, freeRemaining: 1 });
+  assert.deepEqual(mock.calls[0], {
+    type: "function",
+    name: "analyze-transaction",
+    options: { body: { analysisId, hash: transactionHash, network: "base" } }
+  });
+  assert.equal([...storage.values.values()].some((value) => value.includes(transactionHash)), false);
+  assert.equal([...storage.values.values()].some((value) => value.includes(analysisId)), false);
+});
+
+test("deterministic protected-analysis rejection releases its idempotency attempt", async () => {
+  const { createCreditClient } = await import("../js/credit-client.mjs");
+  const storage = createStorage();
+  let nextId = 1;
+  const mock = createClient({
+    invoke: async () => ({
+      data: null,
+      error: { context: new Response(JSON.stringify({ error: "transaction_not_found" })) }
+    })
+  });
+  const client = createCreditClient(mock.client, {
+    createId: () => `70000000-0000-4000-8000-${String(nextId++).padStart(12, "0")}`,
+    storage
+  });
+  await assert.rejects(client.analyze(`0x${"c".repeat(64)}`, "base", "user-1"), {
+    code: "transaction_not_found"
+  });
+  await assert.rejects(client.analyze(`0x${"d".repeat(64)}`, "base", "user-1"), {
+    code: "transaction_not_found"
+  });
+  assert.equal(mock.calls.length, 2);
+  assert.notEqual(mock.calls[0].options.body.analysisId, mock.calls[1].options.body.analysisId);
 });

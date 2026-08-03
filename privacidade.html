@@ -13,15 +13,15 @@
       <p class="section-label">Privacidade</p>
       <h1>Seus segredos não entram aqui.</h1>
       <p>O Tx Raio-X analisa somente hashes e informações públicas registradas em blockchains.</p>
-      <h2>Dados locais</h2>
-      <p>O contador de análises e o estado do desbloqueio beta são salvos no armazenamento local do navegador. Limpar esses dados pode remover o acesso.</p>
+      <h2>Dados de uso</h2>
+      <p>A franquia gratuita, as compras e os consumos são registrados no ledger da conta. O navegador mantém apenas estado temporário para repetir com segurança uma solicitação interrompida; limpar dados locais não restaura a franquia nem apaga o saldo da conta.</p>
       <h2>Conta opcional</h2>
-      <p>Você pode usar o produto gratuitamente sem cadastro. Ao optar por entrar, o Supabase trata seu identificador de usuário, e-mail, provedor de login e sessão para autenticação e futura recuperação de compras. No login com Google, solicitamos apenas os dados básicos necessários para identificar a conta; não acessamos sua caixa de entrada.</p>
-      <p>Senhas são enviadas diretamente ao serviço de autenticação e nunca são armazenadas pelo Tx Raio-X no navegador ou em nossas tabelas. Carteiras e hashes consultados não são associados à sua conta.</p>
+      <p>A busca pública e o exemplo podem ser usados sem cadastro. Para realizar análises reais e receber a franquia gratuita única, é necessária uma conta. O Supabase trata seu identificador de usuário, e-mail, provedor de login e sessão para autenticação, limite de uso e recuperação de compras. No login com Google, solicitamos apenas os dados básicos necessários para identificar a conta; não acessamos sua caixa de entrada.</p>
+      <p>Senhas são enviadas diretamente ao serviço de autenticação e nunca são armazenadas pelo Tx Raio-X no navegador ou em nossas tabelas. A análise por hash passa por uma função protegida, mas o hash bruto, a carteira e o resultado não são gravados nas tabelas de cobrança nem nos logs operacionais; guardamos apenas um fingerprint criptográfico para idempotência.</p>
       <h2>O que nunca pedimos</h2>
       <p>Não solicitamos chave privada, frase-semente, conexão de carteira ou permissão para movimentar ativos.</p>
       <h2>Serviços externos</h2>
-      <p>Para localizar transações, o aplicativo consulta endpoints públicos das redes suportadas. Ao buscar por carteira, o endereço público é enviado às instâncias do Blockscout selecionadas, sem ser salvo pelo Tx Raio-X. Supabase e Google podem tratar os dados necessários à autenticação conforme suas próprias políticas. O provedor de pagamento escolhido poderá tratar os dados necessários à compra conforme a própria política.</p>
+      <p>Para localizar transações, a função protegida consulta endpoints públicos das redes suportadas. Ao buscar por carteira, o endereço público é enviado às instâncias do Blockscout selecionadas, sem ser salvo pelo Tx Raio-X. Supabase e Google podem tratar os dados necessários à autenticação conforme suas próprias políticas. O Mercado Pago trata os dados necessários à compra conforme sua própria política.</p>
     </main>
   </body>
 </html>

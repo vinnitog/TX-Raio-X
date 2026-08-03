@@ -35,6 +35,16 @@ Deno.serve(createConsumeAnalysisHandler({
     const { data, error } = await getSupabaseAdmin().auth.getUser(token);
     return error ? null : data.user;
   },
+  enforceRateLimit: async (userId: string) => {
+    const { data, error } = await getSupabaseAdmin().rpc("enforce_account_rate_limit", {
+      p_user_id: userId,
+      p_scope: "consume_analysis",
+      p_limit: 30,
+      p_window_seconds: 60
+    });
+    if (error) throw error;
+    return data === true;
+  },
   consumeCredit: async (userId: string, analysisId: string) => {
     const { data, error } = await getSupabaseAdmin()
       .rpc("consume_analysis_credit", {

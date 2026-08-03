@@ -4,6 +4,12 @@
   "private": true,
   "description": "PWA que traduz transações EVM para português claro.",
   "scripts": {
-    "test": "node --test unit/*.test.js"
+    "test": "node --test unit/*.test.js",
+    "test:e2e": "playwright test",
+    "test:e2e:auth": "playwright test e2e/auth.spec.js",
+    "test:e2e:payments": "playwright test e2e/payment-matrix.spec.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1"
   }
 }

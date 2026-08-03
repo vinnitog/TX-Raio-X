@@ -1,4 +1,4 @@
-const CACHE_NAME = "tx-raio-x-v46";
+const CACHE_NAME = "tx-raio-x-v47";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -10,8 +10,7 @@ const APP_SHELL = [
   "./js/auth-controller.mjs",
   "./js/auth-service.mjs",
   "./js/supabase-client.mjs",
-  "./js/analyzer.mjs",
-  "./js/chain-client.mjs",
+  "./js/demo-analysis.mjs",
   "./js/checkout-client.mjs",
   "./js/checkout-flow.mjs",
   "./js/credit-client.mjs",

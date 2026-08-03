@@ -1,3 +1,5 @@
+import { createRequestTelemetry, getRequestId, withRequestId } from "./observability.mjs";
+
 const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export class ConsumeAnalysisHttpError extends Error {
@@ -28,21 +30,25 @@ export function validateConsumeRequest(body) {
     && UUID_V4_PATTERN.test(body.analysisId ?? "");
 }
 
-function jsonResponse(body, status, corsHeaders) {
+function jsonResponse(body, status, corsHeaders, requestId) {
   return Response.json(body, {
     status,
-    headers: { ...corsHeaders, "Cache-Control": "no-store" }
+    headers: withRequestId({ ...corsHeaders, "Cache-Control": "no-store" }, requestId)
   });
 }
 
 export function createConsumeAnalysisHandler({
   loadAllowedOrigins,
   authenticate,
+  enforceRateLimit = async () => true,
   consumeCredit,
-  logger = console
+  logger = console,
+  now = () => Date.now()
 }) {
   return async function handleConsumeAnalysis(request) {
     let corsHeaders = {};
+    const requestId = getRequestId(request);
+    const telemetry = createRequestTelemetry(logger, "consume_analysis_request", requestId, now);
     try {
       const origin = request.headers.get("Origin") ?? "";
       const allowedOrigins = loadAllowedOrigins();
@@ -51,7 +57,8 @@ export function createConsumeAnalysisHandler({
         throw new ConsumeAnalysisHttpError(403, "origin_not_allowed", "Origin is not allowed.");
       }
       if (request.method === "OPTIONS") {
-        return new Response(null, { status: 204, headers: corsHeaders });
+        telemetry.ignored({ code: "preflight", status: 204 });
+        return new Response(null, { status: 204, headers: withRequestId(corsHeaders, requestId) });
       }
       if (request.method !== "POST") {
         throw new ConsumeAnalysisHttpError(405, "method_not_allowed", "Use POST.");
@@ -65,6 +72,9 @@ export function createConsumeAnalysisHandler({
       const user = await authenticate(token);
       if (!user?.id) {
         throw new ConsumeAnalysisHttpError(401, "invalid_session", "The authenticated session is invalid.");
+      }
+      if (!await enforceRateLimit(user.id)) {
+        throw new ConsumeAnalysisHttpError(429, "rate_limited", "Too many analysis requests.");
       }
 
       const contentType = request.headers.get("Content-Type")?.split(";", 1)[0]?.trim().toLowerCase();
@@ -94,22 +104,25 @@ export function createConsumeAnalysisHandler({
         throw new ConsumeAnalysisHttpError(402, "credits_exhausted", "No analysis credits are available.");
       }
       const balance = Number(result.balance);
-      if (!Number.isSafeInteger(balance) || balance < 0) {
+      const freeRemaining = Number(result.free_remaining);
+      if (!Number.isSafeInteger(balance) || balance < 0
+        || !Number.isSafeInteger(freeRemaining) || freeRemaining < 0
+        || !["free", "paid"].includes(result.source)) {
         throw new Error("Database returned an invalid credit balance.");
       }
+      telemetry.success({ status: 200, source: result.source, applied: Boolean(result.applied) });
       return jsonResponse({
         consumed: true,
         applied: Boolean(result.applied),
-        balance
-      }, 200, corsHeaders);
+        balance,
+        freeRemaining,
+        source: result.source
+      }, 200, corsHeaders, requestId);
     } catch (error) {
       const status = error instanceof ConsumeAnalysisHttpError ? error.status : 500;
       const code = error instanceof ConsumeAnalysisHttpError ? error.code : "internal_error";
-      logger.error("consume_analysis_error", {
-        code,
-        message: String(error?.message ?? error).slice(0, 200)
-      });
-      return jsonResponse({ error: code }, status, corsHeaders);
+      telemetry.error({ code, status });
+      return jsonResponse({ error: code }, status, corsHeaders, requestId);
     }
   };
 }

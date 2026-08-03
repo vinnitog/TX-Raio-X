@@ -42,7 +42,7 @@ test("Pages uses the required permissions and deployment environment", () => {
   );
 });
 
-test("Pages uploads the repository root and deploys in the required order", () => {
+test("Pages uploads only the public allowlist and deploys in the required order", () => {
   const checkout = workflow.indexOf("actions/checkout@");
   const configure = workflow.indexOf("actions/configure-pages@");
   const upload = workflow.indexOf("actions/upload-pages-artifact@");
@@ -52,7 +52,10 @@ test("Pages uploads the repository root and deploys in the required order", () =
   assert.ok(configure < upload && upload < deploy);
   assert.match(workflow, /actions\/checkout@v6/);
   assert.match(workflow, /actions\/configure-pages@v5/);
-  assert.match(workflow, /actions\/upload-pages-artifact@v4[\s\S]*?path:\s*["']\.["']/);
+  assert.match(workflow, /Build public allowlist[\s\S]*?mkdir -p _site\/js/);
+  assert.match(workflow, /actions\/upload-pages-artifact@v4[\s\S]*?path:\s*["']_site["']/);
+  assert.doesNotMatch(workflow, /cp -R (?:\.|supabase|docs|unit)/);
+  assert.doesNotMatch(workflow, /js\/(?:transaction-analyzer|transaction-chain|analyzer|chain-client)\.mjs/);
   assert.match(workflow, /id:\s*deployment[\s\S]*?actions\/deploy-pages@v4/);
   assert.ok(fs.existsSync(path.join(root, "index.html")));
 });

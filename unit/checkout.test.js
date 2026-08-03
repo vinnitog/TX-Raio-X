@@ -69,6 +69,11 @@ test("the server owns the complete commercial snapshot", () => {
   assert.match(payload.back_urls.success, /source=checkout&checkout_status=success$/);
   assert.match(payload.back_urls.pending, /source=checkout&checkout_status=pending$/);
   assert.match(payload.back_urls.failure, /source=checkout&checkout_status=failure$/);
+  assert.deepEqual(payload.payment_methods, {
+    excluded_payment_types: [{ id: "ticket" }],
+    installments: 1,
+    default_installments: 1
+  });
 });
 
 test("checkout stays locked to test mode and HTTPS callbacks", () => {
@@ -101,7 +106,12 @@ test("preference recovery requires the matching commercial snapshot", () => {
   const preference = {
     id: "preference-1",
     external_reference: order.id,
-    items: [{ id: order.package_code, quantity: 1, currency_id: "BRL", unit_price: 4.9 }]
+    items: [{ id: order.package_code, quantity: 1, currency_id: "BRL", unit_price: 4.9 }],
+    payment_methods: {
+      excluded_payment_types: [{ id: "ticket" }],
+      installments: 1,
+      default_installments: 1
+    }
   };
 
   assert.equal(validatePreferenceSnapshot(preference, order), preference);
@@ -115,6 +125,13 @@ test("preference recovery requires the matching commercial snapshot", () => {
   );
   assert.throws(
     () => validatePreferenceSnapshot({ ...preference, items: [...preference.items, { ...preference.items[0] }] }, order),
+    /does not match/
+  );
+  assert.throws(
+    () => validatePreferenceSnapshot({
+      ...preference,
+      payment_methods: { ...preference.payment_methods, default_installments: 2 }
+    }, order),
     /does not match/
   );
   assert.equal(findPreferenceByExternalReference({ elements: [preference] }, order.id), preference);
@@ -302,6 +319,11 @@ function preferenceFor(order, overrides = {}) {
       currency_id: order.currency,
       unit_price: order.amount_cents / 100
     }],
+    payment_methods: {
+      excluded_payment_types: [{ id: "ticket" }],
+      installments: 1,
+      default_installments: 1
+    },
     sandbox_init_point: "https://sandbox.mercadopago.com/checkout/pref-1",
     ...overrides
   };

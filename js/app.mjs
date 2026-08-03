@@ -6,8 +6,7 @@ import {
   isLocalTestEnvironment,
   UNLOCKED_WALLET_HISTORY_LIMIT
 } from "./config.mjs";
-import { analyzeTransaction, createDemoAnalysis, isTransactionHash } from "./analyzer.mjs";
-import { findTransaction } from "./chain-client.mjs";
+import { createDemoAnalysis, isTransactionHash } from "./demo-analysis.mjs";
 import {
   findRecentTransactions,
   isWalletAddress,
@@ -24,8 +23,7 @@ import {
 import { CheckoutClientError, createCheckoutClient } from "./checkout-client.mjs";
 import {
   CreditClientError,
-  createCreditClient,
-  fingerprintAnalysis
+  createCreditClient
 } from "./credit-client.mjs";
 import {
   createCheckoutLoadingController,
@@ -141,6 +139,7 @@ let accountEntitlement = {
   status: "guest",
   userId: null,
   balance: 0,
+  freeRemaining: 0,
   hasPaidAccess: false
 };
 const IS_LOCAL_DEMO = isLocalTestEnvironment(window.location.hostname);
@@ -158,13 +157,19 @@ const getCreditClient = createRetryableLoader(
 );
 
 function hasPaidWalletAccess(usage = readUsage(localStorage)) {
-  if (usage.unlocked) return true;
+  if (IS_LOCAL_DEMO && usage.unlocked) return true;
   return IS_LOCAL_DEMO ? usage.paid : accountEntitlement.hasPaidAccess;
 }
 
 function updateUsageLabel() {
   const usage = readUsage(localStorage);
-  const freeRemaining = getFreeRemaining(usage, FREE_ANALYSES);
+  if (!IS_LOCAL_DEMO && accountEntitlement.status === "guest") {
+    elements.usageText.textContent = "Entre para liberar 2 grátis";
+    return;
+  }
+  const freeRemaining = IS_LOCAL_DEMO
+    ? getFreeRemaining(usage, FREE_ANALYSES)
+    : accountEntitlement.freeRemaining;
   elements.usageText.textContent = formatUsageSummary({
     freeRemaining,
     balance: accountEntitlement.balance,
@@ -209,7 +214,7 @@ function updateConfiguredCopy() {
 }
 
 function updatePurchaseAvailability() {
-  elements.priceSection.hidden = readUsage(localStorage).unlocked;
+  elements.priceSection.hidden = IS_LOCAL_DEMO && readUsage(localStorage).unlocked;
 }
 
 function showToast(message, duration = 4200) {
@@ -313,10 +318,20 @@ function formatTransactionDate(timestamp) {
 
 function getAnalyzeActionLabel() {
   const usage = readUsage(localStorage);
-  if (usage.unlocked) return "Analisar";
-  if (getFreeRemaining(usage, FREE_ANALYSES) > 0) return "Analisar · usa 1 grátis";
-  if (IS_LOCAL_DEMO && usage.credits > 0) return "Analisar · usa 1 análise extra";
+  if (!IS_LOCAL_DEMO && accountEntitlement.status === "guest") {
+    return "Analisar · entre para usar grátis";
+  }
+  if (IS_LOCAL_DEMO && usage.unlocked) return "Analisar";
+  if (IS_LOCAL_DEMO) {
+    if (getFreeRemaining(usage, FREE_ANALYSES) > 0) return "Analisar · usa 1 grátis";
+    if (usage.credits > 0) return "Analisar · usa 1 análise extra";
+    return "Analisar · requer análises extras";
+  }
+  if (accountEntitlement.status === "guest") return "Analisar · entre para usar grátis";
   if (accountEntitlement.status === "loading") return "Analisar · carregando saldo";
+  if (accountEntitlement.status === "ready" && accountEntitlement.freeRemaining > 0) {
+    return "Analisar · usa 1 grátis";
+  }
   if (accountEntitlement.status === "ready" && accountEntitlement.balance > 0) {
     return "Analisar · usa 1 crédito da conta";
   }
@@ -332,16 +347,22 @@ function renderAccountEntitlement() {
 async function refreshCreditEntitlement(session) {
   const requestId = ++entitlementRequestId;
   if (session === null || (session && !session.user?.id)) {
-    accountEntitlement = { status: "guest", userId: null, balance: 0, hasPaidAccess: false };
+    accountEntitlement = {
+      status: "guest", userId: null, balance: 0, freeRemaining: 0, hasPaidAccess: false
+    };
     renderAccountEntitlement();
     return accountEntitlement;
   }
 
   const expectedUserId = session?.user?.id ?? accountEntitlement.userId;
+  const accountChanged = Boolean(expectedUserId)
+    && expectedUserId !== accountEntitlement.userId;
   accountEntitlement = {
-    ...accountEntitlement,
     status: "loading",
-    userId: expectedUserId ?? null
+    userId: expectedUserId ?? null,
+    balance: accountChanged ? 0 : accountEntitlement.balance,
+    freeRemaining: accountChanged ? 0 : accountEntitlement.freeRemaining,
+    hasPaidAccess: accountChanged ? false : accountEntitlement.hasPaidAccess
   };
   renderAccountEntitlement();
   try {
@@ -352,8 +373,11 @@ async function refreshCreditEntitlement(session) {
     if (requestId !== entitlementRequestId) return accountEntitlement;
     accountEntitlement = error instanceof CreditClientError
       && error.code === "authentication_required"
-      ? { status: "guest", userId: null, balance: 0, hasPaidAccess: false }
-      : { status: "error", userId: expectedUserId ?? null, balance: 0, hasPaidAccess: false };
+      ? { status: "guest", userId: null, balance: 0, freeRemaining: 0, hasPaidAccess: false }
+      : {
+          status: "error", userId: expectedUserId ?? null,
+          balance: 0, freeRemaining: 0, hasPaidAccess: false
+        };
   }
   renderAccountEntitlement();
   return accountEntitlement;
@@ -590,24 +614,34 @@ async function runAnalysis(hash, networkId, setPending, showError) {
   if (analysisInProgress || walletSearchInProgress) return;
 
   const usage = readUsage(localStorage);
-  const freeRemaining = getFreeRemaining(usage, FREE_ANALYSES);
-  const usesLocalCredit = IS_LOCAL_DEMO && !usage.unlocked
-    && freeRemaining === 0 && usage.credits > 0;
-  const requiresAccountCredit = !usage.unlocked && freeRemaining === 0 && !usesLocalCredit;
+  const requiresHostedAccount = !IS_LOCAL_DEMO;
+  const requiresServerAllowance = requiresHostedAccount;
+  const localFreeRemaining = getFreeRemaining(usage, FREE_ANALYSES);
+  const hasLocalAllowance = usage.unlocked || localFreeRemaining > 0 || usage.credits > 0;
 
-  if (requiresAccountCredit && accountEntitlement.status !== "ready") {
+  if (requiresHostedAccount && accountEntitlement.status !== "ready") {
     await refreshCreditEntitlement();
   }
-  if (requiresAccountCredit && accountEntitlement.status === "error") {
+  if (requiresHostedAccount && accountEntitlement.status === "guest") {
+    showError("Entre ou crie uma conta para usar suas duas análises grátis.");
+    (await authControllerPromise)?.open();
+    return;
+  }
+  if (requiresHostedAccount && accountEntitlement.status === "error") {
     showError("Não conseguimos consultar o saldo da sua conta. Verifique a conexão e tente novamente.");
     return;
   }
-  if (requiresAccountCredit && accountEntitlement.balance < 1) {
+  if (requiresServerAllowance
+    && accountEntitlement.freeRemaining + accountEntitlement.balance < 1) {
     openPaywall();
     return;
   }
-  const expectedCreditUserId = requiresAccountCredit ? accountEntitlement.userId : null;
-  if (requiresAccountCredit && !expectedCreditUserId) {
+  if (IS_LOCAL_DEMO && !hasLocalAllowance) {
+    openPaywall();
+    return;
+  }
+  const expectedCreditUserId = requiresServerAllowance ? accountEntitlement.userId : null;
+  if (requiresServerAllowance && !expectedCreditUserId) {
     showError("Não conseguimos confirmar a conta responsável pelo crédito. Entre novamente.");
     return;
   }
@@ -616,39 +650,27 @@ async function runAnalysis(hash, networkId, setPending, showError) {
   setPending(true);
   setAnalysisControlsDisabled(true);
   try {
-    const rawTransaction = await findTransaction(hash, networkId);
-    const result = analyzeTransaction(rawTransaction);
-    if (requiresAccountCredit) {
-      try {
-        const fingerprint = await fingerprintAnalysis(hash, networkId);
-        const creditClient = await getCreditClient();
-        const analysisId = creditClient.prepareAnalysis(expectedCreditUserId, fingerprint);
-        const consumption = await creditClient.consume(analysisId, expectedCreditUserId);
-        accountEntitlement = {
-          ...accountEntitlement,
-          status: "ready",
-          balance: consumption.balance
-        };
-        renderAccountEntitlement();
-      } catch (error) {
-        if (error instanceof CreditClientError && error.code === "credits_exhausted") {
-          accountEntitlement = { ...accountEntitlement, status: "ready", balance: 0 };
-          renderAccountEntitlement();
-          openPaywall();
-          showError("Seu saldo foi usado em outra sessão. Recarregue a conta para continuar.");
-        } else if (error instanceof CreditClientError && error.code === "account_changed") {
-          showError("A conta mudou durante a análise. Entre novamente na conta original para confirmar o crédito.");
-        } else if (error instanceof CreditClientError
-          && error.code === "consumption_reconciliation_required") {
-          showError("Existe uma análise anterior aguardando confirmação. Repita aquela análise antes de iniciar outra.");
-        } else {
-          showError("A análise foi encontrada, mas não conseguimos confirmar o uso do crédito. Tente novamente.");
-        }
-        return;
-      }
+    let result;
+    if (requiresServerAllowance) {
+      const protectedResult = await (await getCreditClient())
+        .analyze(hash, networkId, expectedCreditUserId);
+      accountEntitlement = {
+        ...accountEntitlement,
+        status: "ready",
+        balance: protectedResult.entitlement.balance,
+        freeRemaining: protectedResult.entitlement.freeRemaining
+      };
+      renderAccountEntitlement();
+      result = protectedResult.analysis;
+    } else {
+      const [{ findTransaction }, { analyzeTransaction }] = await Promise.all([
+        import("../supabase/functions/_shared/transaction-chain.mjs"),
+        import("../supabase/functions/_shared/transaction-analyzer.mjs")
+      ]);
+      result = analyzeTransaction(await findTransaction(hash, networkId));
     }
     showResult(result);
-    if (!requiresAccountCredit) {
+    if (IS_LOCAL_DEMO && !usage.unlocked) {
       try {
         consumeAnalysis(localStorage, FREE_ANALYSES);
         updateUsageLabel();
@@ -657,7 +679,24 @@ async function runAnalysis(hash, networkId, setPending, showError) {
       }
     }
   } catch (error) {
-    showError(error.message);
+    if (error instanceof CreditClientError && error.code === "credits_exhausted") {
+      await refreshCreditEntitlement();
+      openPaywall();
+      showError("Seu saldo foi usado em outra sessão. Recarregue a conta para continuar.");
+    } else if (error instanceof CreditClientError && error.code === "account_changed") {
+      showError("A conta mudou durante a análise. Entre novamente na conta original para continuar.");
+    } else if (error instanceof CreditClientError
+      && error.code === "consumption_reconciliation_required") {
+      showError("Existe uma análise anterior aguardando confirmação. Repita aquela análise antes de iniciar outra.");
+    } else if (error instanceof CreditClientError && error.code === "transaction_not_found") {
+      showError("O hash não foi encontrado na rede escolhida. Confirme o hash e tente novamente.");
+    } else if (error instanceof CreditClientError && error.code === "rate_limited") {
+      showError("Muitas análises em pouco tempo. Aguarde um minuto e tente novamente.");
+    } else if (error instanceof CreditClientError) {
+      showError("Não conseguimos concluir a análise protegida agora. Tente novamente.");
+    } else {
+      showError(error.message);
+    }
   } finally {
     analysisInProgress = false;
     setPending(false);
@@ -694,11 +733,14 @@ function getCheckoutErrorMessage(error) {
   if (error.code === "origin_not_allowed") {
     return "Este endereço ainda não está autorizado para iniciar compras.";
   }
+  if (error.code === "rate_limited") {
+    return "Muitas tentativas de checkout. Aguarde alguns minutos e tente novamente.";
+  }
   return "Não conseguimos abrir o checkout de teste agora. Tente novamente.";
 }
 
 async function beginCheckout() {
-  if (readUsage(localStorage).unlocked) {
+  if (IS_LOCAL_DEMO && readUsage(localStorage).unlocked) {
     showToast("Seu acesso legado já é ilimitado.");
     return;
   }

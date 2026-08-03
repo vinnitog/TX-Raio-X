@@ -1,4 +1,4 @@
-import { NETWORKS } from "./config.mjs";
+import { NETWORKS } from "./transaction-networks.mjs";
 
 const RPC_ATTEMPT_TIMEOUT_MS = 9000;
 
@@ -12,6 +12,13 @@ class RpcReceiptMissingError extends Error {
 }
 
 class NetworkNotFoundError extends Error {}
+
+export class TransactionLookupError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+  }
+}
 
 async function rpcRequest(network, rpcUrl, method, params, signal) {
   const response = await fetch(rpcUrl, {
@@ -186,7 +193,7 @@ export async function findTransaction(hash, selectedNetwork = "auto") {
     : NETWORKS.filter((network) => network.id === selectedNetwork);
 
   if (candidates.length === 0) {
-    throw new Error("A rede selecionada não é suportada.");
+    throw new TransactionLookupError("unsupported_network", "A rede selecionada não é suportada.");
   }
 
   const operationController = new AbortController();
@@ -203,12 +210,14 @@ export async function findTransaction(hash, selectedNetwork = "auto") {
   } catch (aggregateError) {
     const errors = aggregateError.errors ?? [aggregateError];
     if (errors.some((error) => !(error instanceof NetworkNotFoundError))) {
-      throw new Error(
+      throw new TransactionLookupError(
+        "rpc_unavailable",
         "Não foi possível confirmar esse hash agora porque um ou mais provedores RPC falharam. Tente novamente."
       );
     }
 
-    throw new Error(
+    throw new TransactionLookupError(
+      "transaction_not_found",
       selectedNetwork === "auto"
         ? "O hash não foi encontrado nas redes consultadas. Confirme o hash ou escolha a rede."
         : "O hash não foi encontrado na rede escolhida. Confirme o hash e tente novamente."
