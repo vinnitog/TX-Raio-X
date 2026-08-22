@@ -13,7 +13,7 @@ for (const [scenario, checkoutStatus, message] of returns) {
     await mockSupabase(page, { session: E2E_SESSION, entitlement: {
       balance: 0, freeRemaining: 0, hasPaidAccess: false
     } });
-    await page.goto(`/?checkout_status=${checkoutStatus}&status=${scenario}&payment_id=123&external_reference=order-e2e&merchant_account_id=null`);
+    await page.goto(`/?checkout_status=${checkoutStatus}&session_id=cs_test_e2e&source=checkout`);
 
     await expect(page.locator("#toast")).toContainText(message);
     await expect.poll(() => page.url()).toBe("http://txraiox.test:4173/");
@@ -23,7 +23,7 @@ for (const [scenario, checkoutStatus, message] of returns) {
   });
 }
 
-test("authenticated purchase sends the Mercado Pago sandbox checkout to an isolated tab", async ({ page }) => {
+test("authenticated purchase sends Stripe Checkout to an isolated tab", async ({ page }) => {
   await mockSupabase(page, { session: E2E_SESSION, entitlement: {
     balance: 0, freeRemaining: 2, hasPaidAccess: false
   } });
@@ -52,7 +52,7 @@ test("authenticated purchase sends the Mercado Pago sandbox checkout to an isola
   await page.locator("#price-unlock-button").click();
 
   await expect.poll(() => page.evaluate(() => window.__txRaioXOpenedTab)).toEqual({
-    url: "https://sandbox.mercadopago.com/checkout/v1/redirect/e2e",
+    url: "https://checkout.stripe.com/c/pay/cs_test_e2echeckout",
     closed: false,
     opener: null,
     target: "_blank"

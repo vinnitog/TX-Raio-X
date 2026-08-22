@@ -288,8 +288,8 @@ test("financial tables explicitly exclude transaction, wallet, payload and PII f
 test("monetization policy keeps partial refunds out of the automatic ledger", () => {
   const strategy = normalize(read("docs/MONETIZATION_STRATEGY.md"));
 
-  assert.ok(strategy.includes("apenas reembolso integral ou chargeback reverte os 10 créditos"));
-  assert.ok(strategy.includes("reembolso parcial não altera o ledger de créditos automaticamente"));
+  assert.match(strategy, /reembolso integral ou disputa aberta\s+reverte o pacote uma vez/i);
+  assert.match(strategy, /reembolso parcial atualiza o pagamento, mas não muda\s+o ledger automaticamente/i);
   assert.ok(strategy.includes("conciliação e tratamento manual"));
 });
 

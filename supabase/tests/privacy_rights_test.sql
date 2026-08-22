@@ -17,7 +17,7 @@ select extensions.ok(
 );
 
 insert into public.orders (
-  id, user_id, provider, provider_preference_id, idempotency_key, status,
+  id, user_id, provider, provider_checkout_session_id, idempotency_key, status,
   package_code, package_credits, amount_cents, currency
 ) values
   ('92000000-0000-4000-8000-000000000001', '91000000-0000-4000-8000-000000000001',

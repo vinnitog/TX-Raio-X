@@ -1,63 +1,50 @@
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
+const { readFileSync } = require("node:fs");
 const test = require("node:test");
+const sql = readFileSync("supabase/migrations/20260822000300_migrate_billing_to_stripe.sql", "utf8").toLowerCase().replace(/\s+/g, " ");
 
-const root = path.join(__dirname, "..");
-const migrationPath = path.join(root, "supabase/migrations/20260731000200_process_mercado_pago_webhook.sql");
-const sql = fs.readFileSync(migrationPath, "utf8").toLowerCase().replace(/\s+/g, " ");
-
-test("webhook RPC is transactional, security definer and service-role only", () => {
-  assert.match(sql, /create or replace function public\.process_mercado_pago_payment/);
+test("Stripe webhook RPC is transactional, idempotent and service-role only", () => {
+  assert.match(sql, /create or replace function public\.process_stripe_payment/);
   assert.match(sql, /language plpgsql security definer set search_path = ''/);
-  assert.match(sql, /select \* into locked_order from public\.orders where id = p_order_id for update/);
-  assert.match(sql, /revoke all on function public\.process_mercado_pago_payment[\s\S]*from public, anon, authenticated/);
-  assert.match(sql, /grant execute on function public\.process_mercado_pago_payment[\s\S]*to service_role/);
+  assert.match(sql, /billing_webhook_events[\s\S]*primary key \(provider, provider_environment, provider_event_id\)/);
+  assert.match(sql, /insert into public\.billing_webhook_events[\s\S]*on conflict do nothing/);
+  assert.match(sql, /revoke all on function public\.process_stripe_payment[\s\S]*public, anon, authenticated/);
+  assert.match(sql, /grant execute on function public\.process_stripe_payment[\s\S]*service_role/);
 });
 
-test("approved payments credit once using independent database constraints", () => {
-  assert.match(sql, /if p_status = 'approved' and locked_order\.user_id is not null then/);
-  assert.match(sql, /'purchase', locked_order\.package_credits/);
-  assert.match(sql, /on conflict do nothing/);
-  assert.match(sql, /'mercado_pago:payment:' \|\| p_provider_payment_id \|\| ':purchase'/);
-});
-
-test("full reversals require an existing purchase and stay idempotent", () => {
+test("approval and full reversal update ledger once while partial refund stays manual", () => {
+  assert.match(sql, /if p_status = 'approved'/);
   assert.match(sql, /p_status = 'refunded' and p_refunded_cents = p_amount_cents/);
   assert.match(sql, /p_status = 'charged_back'/);
-  assert.match(sql, /if exists \( select 1 from public\.credit_ledger purchase_entry where purchase_entry\.payment_id = persisted_payment\.id and purchase_entry\.entry_type = 'purchase' \)/);
-  assert.match(sql, /':reversal'/);
+  assert.match(sql, /on conflict do nothing/);
   assert.doesNotMatch(sql, /p_status = 'refunded' and p_refunded_cents < p_amount_cents/);
 });
 
-test("payment, order state and ledger are changed by one database function", () => {
-  assert.match(sql, /insert into public\.payments/);
-  assert.match(sql, /update public\.orders/);
-  assert.match(sql, /insert into public\.credit_ledger/);
-  assert.equal(sql.includes("commit"), false, "the function must use the caller transaction boundary");
+test("legacy provider processing is removed without deleting financial rows", () => {
+  assert.match(sql, /drop function if exists public\.process_mercado_pago_payment/);
+  assert.doesNotMatch(sql, /delete from public\.(orders|payments|credit_ledger)/);
+  assert.match(sql, /alter table public\.orders alter column provider set default 'stripe'/);
 });
 
-test("provider update time and terminal dominance prevent stale approval races", () => {
-  assert.match(sql, /add column provider_updated_at timestamptz/);
-  assert.match(sql, /persisted_payment\.provider_updated_at > p_provider_updated_at/);
-  assert.match(sql, /persisted_payment\.status in \('refunded', 'charged_back'\)/);
-  assert.match(sql, /p_status not in \('refunded', 'charged_back'\)/);
-  assert.match(sql, /return query select persisted_payment\.id, false, false/);
+test("partial refund before approval preserves the refund snapshot and still credits once", () => {
+  assert.match(sql, /persisted_payment\.status = 'partially_refunded' and p_status = 'approved'/);
+  assert.match(sql, /provider_updated_at = greatest\(provider_updated_at, p_provider_updated_at\)/);
+  assert.match(sql, /status = 'approved'[\s\S]*on conflict do nothing/);
 });
 
-test("distinct approved payment IDs can each credit their paid package", () => {
-  assert.doesNotMatch(sql, /credit_ledger_purchase_order_unique/);
-  assert.match(sql, /'mercado_pago:payment:' \|\| p_provider_payment_id \|\| ':purchase'/);
-  assert.match(sql, /reversal\.payment_id = purchase\.payment_id/);
+test("checkout creation is account-scoped and expiration cannot regress terminal orders", () => {
+  assert.match(sql, /orders_one_open_stripe_checkout_per_user/);
+  assert.match(sql, /create_or_get_stripe_checkout_order/);
+  assert.match(sql, /pg_advisory_xact_lock\(hashtextextended\('privacy-erasure:' \|\| p_user_id::text/);
+  assert.match(sql, /locked_order\.status in \('payment_approved', 'payment_refunded', 'payment_charged_back'\) then return false/);
+});
+test("card failure keeps its Checkout Session reusable while async failure is terminal", () => {
+  assert.match(sql, /p_event_type = 'payment_intent\.payment_failed'[\s\S]*then case[\s\S]*checkout_ready/);
+  assert.match(sql, /else 'payment_' \|\| p_status/);
 });
 
-test("an anonymized order records payment state but never grants new credit", () => {
-  assert.match(sql, /new\.user_id is null and expected_user_id is not null/);
-  assert.match(sql, /if p_status = 'approved' and locked_order\.user_id is not null/);
-  assert.doesNotMatch(sql, /cannot create payment for an anonymized order/);
-});
-
-test("chargeback dominates refund in the aggregate order status", () => {
-  assert.match(sql, /from public\.payments where order_id = locked_order\.id and status = 'charged_back'/);
-  assert.match(sql, /then 'payment_charged_back'/);
+test("partial to approved exception never bypasses payment identity validation", () => {
+  const identityCheck = sql.match(/if has_existing_payment and \([\s\S]*?provider payment identity conflict/)[0];
+  assert.match(identityCheck, /persisted_payment\.order_id is distinct from locked_order\.id/);
+  assert.doesNotMatch(identityCheck, /partially_refunded/);
 });

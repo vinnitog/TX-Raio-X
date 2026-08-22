@@ -23,7 +23,7 @@ As bases legais propostas e os critérios de retenção constam nos artefatos in
 
 ## Compartilhamentos
 
-Supabase presta autenticação, banco, funções e logs; Google participa somente quando o login Google é escolhido; Mercado Pago processa checkout/pagamento; Blockscout e provedores RPC respondem consultas públicas; GitHub Pages hospeda os arquivos estáticos. Regiões, subprocessadores e mecanismos de transferência precisam ser confirmados antes da publicação.
+Supabase presta autenticação, banco, funções e logs; Google participa somente quando o login Google é escolhido; Stripe processa checkout/pagamento; Blockscout e provedores RPC respondem consultas públicas; GitHub Pages hospeda os arquivos estáticos. Regiões, subprocessadores e mecanismos de transferência precisam ser confirmados antes da publicação.
 
 ## Retenção e eliminação
 

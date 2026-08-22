@@ -1,7 +1,5 @@
 const FINANCIAL_RETURN_PARAMETERS = Object.freeze([
-  "checkout_status", "collection_id", "collection_status", "payment_id", "status",
-  "external_reference", "merchant_order_id", "preference_id", "payment_type", "site_id",
-  "processing_mode", "merchant_account_id"
+  "checkout_status", "session_id", "source"
 ]);
 
 export function openCheckoutTab(windowLike) {

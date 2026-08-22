@@ -7,7 +7,7 @@ project_id = "cripto-project"
 [functions.checkout]
 verify_jwt = false
 
-[functions.mercado-pago-webhook]
+[functions.stripe-webhook]
 verify_jwt = false
 
 [functions.consume-analysis]

@@ -1,6 +1,6 @@
 # Estratégia de monetização — Tx Raio-X
 
-Atualizada em: 2026-07-30
+Atualizada em: 2026-08-22
 
 ## Decisão
 
@@ -13,6 +13,41 @@ Adotar **freemium + pacote de uso**:
 
 O pagamento é único, sem renovação automática. Os créditos não expiram durante o
 beta. Uma nova compra soma mais 10 créditos.
+
+## Provedor de pagamento — decisão de 22 de agosto de 2026
+
+O checkout ativo passa a ser **Stripe Checkout em pagamento único**. A oferta,
+preço e entrega permanecem em 10 análises por R$ 4,90, sem assinatura.
+
+| Modelo avaliado | Benefício | Risco/custo | Decisão |
+|---|---|---|---|
+| Manter somente Mercado Pago | Preserva o fluxo já testado | Mantém código e operação que não serão usados | Encerrar |
+| Manter Mercado Pago e Stripe | Redundância de provedor | Duplica webhooks, conciliação, testes e superfície de fraude | Rejeitar no MVP |
+| Usar somente Stripe Checkout | Reaproveita o padrão seguro já validado no Bita Calc e reduz a superfície operacional | Exige nova homologação e confirmação das taxas para tíquete baixo | **Adotar** |
+
+Os registros históricos do sandbox do Mercado Pago não serão apagados ou
+reescritos: permanecem como trilha financeira imutável. Nenhuma nova ordem,
+notificação, secret ou chamada externa usará esse provedor.
+
+### Critérios do Stripe Checkout em teste
+
+- `STRIPE_ENVIRONMENT=test` e credencial `sk_test_` são obrigatórios; produção
+  continua bloqueada até revisão explícita.
+- O backend aceita somente o Price ID configurado para `analysis_pack_10` e
+  valida sessão, modo `payment`, valor de 490 centavos, moeda BRL, ordem e preço.
+- A ordem autenticada é criada antes da sessão do Stripe. Repetições usam a mesma
+  chave de idempotência e nunca criam crédito pelo retorno do navegador.
+- Somente um webhook com assinatura Stripe válida, ambiente correspondente e
+  recurso relido na API oficial pode gravar pagamento e ledger.
+- `checkout.session.completed` ou `checkout.session.async_payment_succeeded`
+  credita uma vez quando `payment_status=paid`. Falha/pêndencia não credita.
+- `checkout.session.expired` encerra a ordem sem crédito e libera uma nova
+  tentativa idempotente; cancelar no navegador apenas permite reabrir a mesma
+  sessão ainda válida até ela expirar.
+- Reembolso integral e disputa revertem o pacote uma vez; reembolso parcial fica
+  para conciliação manual e não altera automaticamente o ledger.
+- Produção depende de confirmar a taxa real da Stripe para R$ 4,90 e demonstrar
+  margem positiva após taxa, impostos, custo de análise, fraude e suporte.
 
 ## Trabalho e métrica de valor
 
@@ -90,176 +125,54 @@ Primeira regra de decisão, definida antes de tráfego:
 
 Esses limiares são sinais iniciais, não evidência estatística definitiva.
 
-## Arquitetura financeira do teste
-
-Migration aplicada no projeto Supabase de desenvolvimento em 31 de julho de 2026;
-o histórico local/remoto coincide e o lint remoto do schema `public` foi aprovado.
+## Arquitetura financeira atual do teste
 
 - Supabase Auth identifica a conta recuperável; a exclusão da conta anonimiza a
-  referência ao usuário sem remover os registros financeiros.
-- Ordens preservam o retrato do pacote comprado (10 créditos por R$ 4,90) e
-  pagamentos preservam apenas identificadores operacionais do Mercado Pago.
-- Créditos são derivados de um ledger append-only: compra soma, consumo e
-  reembolso subtraem. Webhooks repetidos não duplicam lançamentos graças a chaves
-  de idempotência únicas.
-- No beta, apenas reembolso integral ou chargeback reverte os 10 créditos do
-  pacote, uma única vez por pagamento. Reembolso parcial não altera o ledger de
-  créditos automaticamente; fica pendente para conciliação e tratamento manual
-  até existir uma política comercial e contábil específica.
-- Nenhuma tabela financeira armazena hash, carteira, payload bruto do provedor ou
-  dados pessoais. O navegador pode apenas consultar registros da própria conta;
-  toda escrita fica restrita ao backend com `service_role`.
+  referência ao usuário sem remover os registros financeiros necessários.
+- Cada ordem Stripe preserva ambiente, Price ID, pacote, quantidade, valor e moeda.
+  O navegador não informa preço nem recebe autoridade para aprovar uma compra.
+- Existe no máximo um checkout Stripe aberto por conta e ambiente. A criação usa
+  lock transacional e retorna a ordem aberta mesmo se a chave local for trocada.
+- O Stripe Checkout é criado em `mode=payment`, com pagamento único, e a versão da
+  API usada pelas Edge Functions fica explicitamente fixada.
+- O webhook valida a assinatura sobre o corpo bruto, aplica janela de cinco
+  minutos, rejeita eventos `livemode=true`, relê o recurso na Stripe e compara
+  sessão, PaymentIntent, Price, ordem, valor, moeda e ambiente.
+- Aprovação soma 10 créditos uma vez. Reembolso integral ou disputa aberta
+  reverte o pacote uma vez. Reembolso parcial atualiza o pagamento, mas não muda
+  o ledger automaticamente e exige conciliação e tratamento manual.
+- Eventos repetidos ou fora de ordem são serializados por ordem e identificador do
+  evento. Uma aprovação atrasada após um reembolso parcial ainda concede somente
+  um pacote e preserva o valor já reembolsado.
+- O retorno do navegador é informativo: ele apenas limpa `checkout_status`,
+  `session_id` e `source`; jamais concede saldo.
+- IDs financeiros e estados ficam no Supabase. Payload bruto, e-mail, documento,
+  cartão, hash e carteira não são persistidos nas tabelas financeiras nem em logs.
 
-Hipótese: uma conta autenticada e um ledger server-side permitem restaurar o saldo
-em outro aparelho e tratar reembolsos sem concessão duplicada. A integração começa
-somente no ambiente de testes. Se a hipótese falhar, o checkout permanece
-desativado e a migration pode ser revertida antes de existir tráfego de produção,
-sem alterar preço, pacote ou gratuidade atuais.
+### Política de disputa encerrada
 
-### Critérios do checkout em ambiente de teste
+`charge.dispute.created` revoga os créditos de forma conservadora. Se a disputa for
+encerrada a favor do Tx Raio-X e os fundos forem restabelecidos, a restauração de
+créditos exige conciliação administrativa idempotente e auditada. A produção fica
+bloqueada até esse procedimento ser exercitado; o MVP não restaura automaticamente
+um saldo apenas com base no retorno do navegador ou em edição manual direta do
+ledger.
 
-- A única oferta aceita pelo backend é `analysis_pack_10`: 10 análises por
-  R$ 4,90. Código, quantidade, preço e moeda são definidos no servidor.
-- O checkout exige uma conta autenticada e cria a ordem financeira antes de criar
-  a preferência no Mercado Pago.
-- A chave de idempotência enviada pelo cliente identifica uma tentativa de compra;
-  repetições devolvem a preferência já associada e não criam uma nova ordem. Uma
-  tentativa concorrente pode receber `checkout_in_progress` enquanto a primeira é
-  conciliada; o cliente deve repetir a mesma chave.
-- O UUID da ordem é enviado como `external_reference`. URLs de retorno e webhook
-  vêm de secrets/configuração do ambiente, nunca do corpo da requisição.
-- A função entrega somente o `sandbox_init_point` enquanto
-  `MERCADO_PAGO_ENVIRONMENT=test`; habilitar produção exige uma alteração explícita
-  e uma nova revisão de segurança, taxas e margem.
+### Critérios do checkout e webhook em teste
 
-Hipótese de exequibilidade: uma preferência do Checkout Pro pode ser criada e
-recuperada sem duplicar ordens durante reenvios do navegador. Tentativas com
-resultado incerto entram em conciliação pelo `external_reference`; depois de cinco
-minutos sem preferência encontrada, uma nova tentativa pode adquirir o lease de
-recuperação. Validar com chamadas repetidas usando a mesma chave e confirmar uma
-única linha em `orders`. Se houver preferência órfã, duplicação ou divergência de
-valor/moeda, manter o checkout desativado, reconciliar o ambiente de teste e
-corrigir o fluxo antes do webhook.
-
-### Hardening do checkout autenticado
-
-Decisão registrada em 31 de julho de 2026: manter a oferta e a arquitetura
-comercial inalteradas, corrigindo somente duas garantias técnicas do checkout de
-teste.
-
-- A Edge Function continuará exigindo `Authorization: Bearer <JWT>`, validado no
-  próprio handler por `auth.getUser()`. A verificação JWT legada anterior ao
-  handler será desativada para aceitar o JWT assimétrico atual sem tornar a função
-  anônima.
-- Cada conta manterá sua própria tentativa pendente no navegador. Alternar A → B
-  → A deve reutilizar a chave de A e nunca criar uma segunda ordem por perda do
-  slot local.
-- O registro local anterior será migrado quando válido, preservando tentativas já
-  iniciadas. Storage bloqueado após reload permanece um risco residual até a
-  conciliação server-side por conta/status existir.
-
-Critérios: chamada sem token ou com token inválido recebe 401 antes de banco ou
-Mercado Pago; origem hostil continua em 403; repetições da mesma conta reutilizam
-a ordem; contas diferentes nunca compartilham chaves; preço, pacote, moeda,
-gratuidade e concessão de créditos não mudam. Falha em qualquer critério mantém o
-checkout de teste desativado e impede o webhook/credenciais de produção.
-
-Até o webhook fornecer um status terminal confiável, tentativas não expiram, não
-são removidas e não são rotacionadas pelo navegador. Isso preserva idempotência,
-mas significa que uma recompra intencional ainda não é suportada. O lifecycle que
-encerra a tentativa e libera uma nova chave é bloqueador explícito do pagamento
-real.
-
-Validação publicada: versão 2 da função `checkout`, ativa no projeto de testes com
-`verify_jwt=false`. O smoke remoto confirmou preflight permitido em 204, origem
-hostil em 403, ausência de bearer em 401 `authentication_required` e bearer
-inválido em 401 `invalid_session`, sempre sem efeito financeiro.
-
-Correção CORS registrada após o smoke no navegador: `supabase.functions.invoke`
-envia também `x-client-info`. O preflight só é considerado aprovado quando
-`Access-Control-Allow-Headers` inclui esse header, além de `authorization`,
-`apikey`, `content-type` e `idempotency-key`; status 204 isolado não basta.
-Correção publicada no projeto de testes em 31/07/2026 e validada remotamente:
-origin `https://vinnitog.github.io` recebeu 204 com todos os headers esperados;
-origin semelhante e não autorizado recebeu 403 `origin_not_allowed` sem
-`Access-Control-Allow-Origin`.
-
-### Retorno do checkout e observabilidade
-
-Decisão registrada após o primeiro pagamento aprovado no sandbox: manter preço,
-pacote, gratuidade e concessão de créditos inalterados, refinando somente a
-experiência e a leitura operacional do checkout.
-
-- O checkout abre em uma nova aba criada diretamente pelo gesto do usuário. Se o
-  navegador bloquear a aba ou ela for fechada antes do redirecionamento, o fluxo
-  usa a aba atual como fallback; a referência `opener` é removida antes de entregar
-  a navegação ao Mercado Pago. Se esse isolamento não puder ser confirmado, a aba
-  auxiliar é fechada e nunca recebe a URL externa.
-- O retorno remove apenas os parâmetros conhecidos do Mercado Pago, incluindo
-  `processing_mode` e `merchant_account_id`, e preserva parâmetros de autenticação,
-  campanha e fragmentos que não pertencem ao pagamento.
-- Repetir uma chave de checkout continua recuperando a mesma ordem, mas o conflito
-  esperado deixa de gerar um erro `23505` nos logs: a escrita ignora a duplicata e
-  consulta a ordem pelo mesmo usuário e chave.
-- Um retorno `success` continua sendo apenas informativo. Nenhum saldo é liberado
-  por URL; somente o webhook e o ledger server-side poderão confirmar a compra.
-
-Critérios: uma única chamada por duplo clique, fallback quando popup for bloqueado,
-fechamento da aba vazia em autenticação/falha, URL limpa após sucesso/pendência/
-falha, preservação dos parâmetros não financeiros e uma única ordem por chave.
-Edge Function atualizada no ambiente de testes em 31/07/2026; o smoke remoto
-confirmou preflight 204 com a allowlist esperada e POST sem sessão em 401
-`authentication_required`, sem efeito financeiro.
-
-## Próximas iterações
-
-### Webhook de pagamento em ambiente de teste
-
-Decisão registrada em 31 de julho de 2026: o webhook é a única origem autorizada
-para transformar um pagamento em créditos. O retorno do navegador continua sendo
-apenas informativo e não altera ordem, pagamento ou ledger.
-
-- A notificação precisa ter assinatura HMAC válida do Mercado Pago antes de
-  qualquer consulta externa ou escrita no banco. O identificador assinado deve
-  coincidir com o corpo da notificação.
-- O probe vazio usado pelo painel para validar a URL recebe `200` apenas quando o
-  body é exatamente `{}`, não há query nem headers `x-signature`/`x-request-id`,
-  e termina sem consultar Mercado Pago ou banco. Toda requisição que contenha
-  sinais de notificação financeira continua exigindo validação e assinatura.
-- Depois da assinatura, a função consulta `/v1/payments/{id}` com o token do
-  vendedor e usa essa resposta como fonte de verdade. O pagamento deve ser de
-  teste, pertencer ao `collector_id` configurado e coincidir com a ordem em
-  `external_reference`, valor inteiro em centavos e moeda.
-- O `live_mode` esperado também é fixado no ambiente. A conta vendedora de teste
-  atual produz pagamentos com `live_mode=true`; aceitar esse valor não habilita
-  produção, pois o ambiente continua travado em `test` e o `collector_id` precisa
-  coincidir com a conta vendedora de teste configurada.
-- Uma função SQL `security definer`, executável somente por `service_role`, grava
-  pagamento, estado da ordem e ledger na mesma transação. Repetições e chamadas
-  concorrentes usam chaves únicas e não duplicam o crédito.
-- Cada `payment_id` aprovado representa dinheiro efetivamente recebido e concede
-  um pacote. Se uma preferência produzir dois pagamentos aprovados distintos,
-  ambos concedem 10 créditos; o reembolso de um deles reverte somente seu próprio
-  pacote. Repetir o mesmo `payment_id` continua sem duplicar saldo.
-- `approved` soma os 10 créditos exatamente uma vez. `pending`, `authorized`,
-  `in_process`, `in_mediation`, `rejected` e `cancelled` não alteram o ledger.
-  Reembolso integral ou `charged_back` reverte os 10 créditos uma única vez,
-  somente se o lançamento de compra existir. Reembolso parcial não altera o
-  ledger automaticamente e exige conciliação manual.
-- Payload bruto, e-mail, documento e dados do pagador não são persistidos nem
-  registrados em logs. Falhas expõem apenas códigos operacionais limitados.
-- O `ts` participa do HMAC, mas não recebe uma janela curta de expiração: o
-  Mercado Pago documenta reenvios após 15 minutos, 6 horas e até vários dias.
-  Replays válidos consultam novamente o recurso atual, cuja
-  `date_last_updated` impede regressão, e chegam a uma transação idempotente; uma
-  janela local de tempo descartaria reenvios legítimos sem ampliar a proteção
-  financeira. Limitação de volume fica para a camada de infraestrutura.
-
-Critérios do teste: assinatura inválida não chama Mercado Pago nem banco;
-pagamento com vendedor, ambiente, ordem, valor ou moeda divergentes é rejeitado;
-aprovação repetida mantém um pagamento e um crédito; estados sem aprovação não
-creditam; reembolso integral e chargeback não produzem saldo negativo quando a
-aprovação anterior não foi processada. Produção permanece bloqueada.
+- usar somente `sk_test_`, Price de teste, endpoint de teste e
+  `STRIPE_ENVIRONMENT=test`;
+- criar a ordem antes da Checkout Session e reutilizar uma sessão aberta por conta;
+- aceitar apenas o host exato `checkout.stripe.com` no redirecionamento;
+- confirmar créditos somente por webhook assinado e recurso relido na Stripe;
+- manter assinatura inválida, evento live, preço/valor/moeda divergente e ordem de
+  outra conta sem efeitos financeiros;
+- manter payment_intent.payment_failed retentável na mesma Checkout Session; somente
+  falha assíncrona terminal ou expiração libera outra ordem;
+- validar aprovação, pendência, recusa, cancelamento, expiração, repetição,
+  reembolso parcial/integral, disputa e recuperação do saldo em outro aparelho;
+- manter credenciais de produção, remoção remota do provedor anterior e publicação
+  definitiva como uma mudança separada depois do smoke Stripe.
 
 ### Saldo recuperável e consumo transacional
 
@@ -367,38 +280,31 @@ relevante, testar verificação mais forte antes de alterar preço ou pacote.
 
 ### Taxas e margem do pacote de R$ 4,90
 
-Revisão registrada em 2 de agosto de 2026 com base nas tarifas públicas do Mercado
-Pago para pagamentos online. Sobre R$ 4,90, antes de impostos, infraestrutura,
-reembolsos e chargebacks:
+Revisão atualizada em 22 de agosto de 2026 pela tabela pública brasileira da
+Stripe. No preço padrão, cartão nacional custa **3,99% + R$ 0,39** por transação;
+cartão internacional acrescenta **2%**. Pix custa **1,19%**, mas aparece como
+recurso disponível somente por convite. O Stripe Checkout está incluído no preço
+do Payments. Fonte: https://stripe.com/br/pricing
 
-| Meio/prazo | Tarifa divulgada | Custo estimado | Receita líquida do pagamento | Líquido por análise |
+| Meio | Tarifa pública | Custo estimado em R$ 4,90 | Líquido do pagamento | Líquido por análise |
 | --- | ---: | ---: | ---: | ---: |
-| Pix, na hora | 0,99% | R$ 0,05 | R$ 4,85 | R$ 0,485 |
-| Cartão, 30 dias | 3,99% | R$ 0,20 | R$ 4,70 | R$ 0,470 |
-| Cartão, na hora/14 dias | 4,99% | R$ 0,24 | R$ 4,66 | R$ 0,466 |
-| Boleto, 3 dias | R$ 3,49 | R$ 3,49 | R$ 1,41 | R$ 0,141 |
+| Cartão nacional | 3,99% + R$ 0,39 | R$ 0,59 | R$ 4,31 | R$ 0,431 |
+| Cartão internacional | 5,99% + R$ 0,39 | R$ 0,68 | R$ 4,22 | R$ 0,422 |
+| Pix, se habilitado por convite | 1,19% | R$ 0,06 | R$ 4,84 | R$ 0,484 |
 
-O pacote tem margem de pagamento entre 95,01% e 99,01% nos meios percentuais,
-mas boleto consumiria cerca de 71,2% do preço. Por isso o beta excluirá o tipo
-`ticket` e limitará cartão a uma parcela na preferência; saldo Mercado Pago, Pix,
-crédito e débito permanecem disponíveis. A validação de uma preferência recuperada
-também precisa conferir essas regras para não reabrir boleto ou parcelamento por
-engano.
+A tarifa de cartão nacional consome aproximadamente 12% do tíquete, antes de
+impostos, infraestrutura, suporte, fraude e chargebacks. A Stripe informa que,
+para preço padrão, emitir reembolso normalmente não adiciona tarifa para cartões,
+mas a tarifa de processamento original não é devolvida. Por isso o pacote mantém
+margem bruta de pagamento positiva, porém produção continua bloqueada até a tarifa
+real da conta e o custo por análise serem conferidos no Dashboard.
 
-A margem de contribuição real ainda depende de impostos da empresa, plano/quota do
-Supabase, custo dos provedores RPC, suporte e perdas por fraude. Como o motor não usa
-IA paga, o teto conservador disponível para todos esses custos é R$ 4,65 por pacote
-no cenário de cartão mais caro. A produção permanece bloqueada até registrar o custo
-real por análise e manter reserva para reembolsos/chargebacks; a tarifa efetiva da
-conta deve ser conferida novamente em **Seu negócio > Custos > Checkouts** antes de
-publicar credenciais reais.
-
-1. Rodar apenas a oferta de R$ 4,90 para evitar dividir o pouco tráfego.
+1. Homologar apenas a oferta de R$ 4,90, sem dividir o tráfego.
 2. Instrumentar o funil sem armazenar hash ou endereço de carteira.
-3. Integrar Mercado Pago e registrar créditos em ledger server-side idempotente.
-4. Adicionar conta recuperável no momento da compra.
+3. Homologar Stripe Checkout e ledger idempotente em test mode.
+4. Confirmar saldo recuperável e matriz de reversões.
 5. Depois de 10 compradores, comparar 10 por R$ 4,90 com 25 por R$ 9,90 em
-   coortes separadas; não exibir vários planos no primeiro teste.
+   coortes separadas, sem exibir vários planos no primeiro teste.
 
 ## Origem metodológica
 

@@ -47,7 +47,7 @@ function createSupabase({ userId = "user-1", invoke, orderStatus = null, orderEr
           return {
             data: {
               orderId: "order-1",
-              checkoutUrl: "https://sandbox.mercadopago.com/checkout/pref-1",
+              checkoutUrl: "https://checkout.stripe.com/c/pay/cs_test_default",
               environment: "test"
             },
             error: null
@@ -325,12 +325,12 @@ test("checkout A -> B -> A preserves A's unresolved idempotency key", async () =
   assert.equal(accountASecond.calls[0].options.headers["Idempotency-Key"], idOne);
 });
 
-test("checkout rejects production or non-sandbox redirect responses", async () => {
+test("checkout rejects production or untrusted redirect responses", async () => {
   const { CheckoutClientError, createCheckoutClient } = await import("../js/checkout-client.mjs");
   for (const response of [
-    { orderId: "order-1", checkoutUrl: "https://www.mercadopago.com/checkout", environment: "production" },
+    { orderId: "order-1", checkoutUrl: "https://checkout.stripe.com/c/pay/cs_live_123", environment: "production" },
     { orderId: "order-1", checkoutUrl: "https://evil.example/checkout", environment: "test" },
-    { orderId: "order-1", checkoutUrl: "https://sandbox.mercadopago.evil.example/checkout", environment: "test" }
+    { orderId: "order-1", checkoutUrl: "https://checkout.stripe.com.evil.example/checkout", environment: "test" }
   ]) {
     const supabase = createSupabase({ invoke: async () => ({ data: response, error: null }) });
     await assert.rejects(
@@ -343,13 +343,13 @@ test("checkout rejects production or non-sandbox redirect responses", async () =
   }
 });
 
-test("checkout accepts the Brazilian Mercado Pago sandbox host", async () => {
+test("checkout accepts the exact Stripe Checkout host", async () => {
   const { createCheckoutClient } = await import("../js/checkout-client.mjs");
   const supabase = createSupabase({
     invoke: async () => ({
       data: {
-        orderId: "order-br",
-        checkoutUrl: "https://sandbox.mercadopago.com.br/checkout/pref-br",
+        orderId: "order-stripe",
+        checkoutUrl: "https://checkout.stripe.com/c/pay/cs_test_checkout",
         environment: "test"
       },
       error: null
@@ -360,7 +360,7 @@ test("checkout accepts the Brazilian Mercado Pago sandbox host", async () => {
     createId: () => idOne
   }).start();
 
-  assert.equal(result.checkoutUrl, "https://sandbox.mercadopago.com.br/checkout/pref-br");
+  assert.equal(result.checkoutUrl, "https://checkout.stripe.com/c/pay/cs_test_checkout");
 });
 
 test("every terminal checkout status rotates its key so the same account can repurchase", async () => {

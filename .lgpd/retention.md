@@ -11,6 +11,6 @@ Documento operacional; validar prazos legais e fiscais com jurídico/contabilida
 | Pedidos de exclusão falhos | 90 dias | Job diário | Diagnóstico e nova tentativa |
 | Pedido `processing` após usuário já removido | 15 minutos até reconciliação | Job marca `completed` quando `user_id` já está nulo | Corrigir falha transitória da auditoria após exclusão confirmada |
 | Ordens, pagamentos e ledger | Prazo fiscal/legal pendente | Na exclusão, `user_id` vira `null`; IDs financeiros permanecem | Obrigações legais, antifraude e reconciliação |
-| Logs de Edge Functions/Supabase/Mercado Pago | Configuração e prazo pendentes de evidência do fornecedor | Não registrar token, e-mail, carteira, hash bruto ou payload integral | Segurança e observabilidade mínima |
+| Logs de Edge Functions/Supabase/Stripe | Configuração e prazo pendentes de evidência do fornecedor | Não registrar token, e-mail, carteira, hash bruto ou payload integral | Segurança e observabilidade mínima |
 
 O job é instalado automaticamente apenas quando a extensão `pg_cron` já estiver habilitada. Antes da produção, confirmar no Supabase Cron a execução diária `tx-raio-x-operational-retention` e guardar evidência da última execução.
