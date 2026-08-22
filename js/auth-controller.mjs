@@ -91,8 +91,8 @@ export async function initAuthController({
     const isSignUp = mode === "sign-up";
     elements.title.textContent = isSignUp ? "Crie sua conta" : "Entre na sua conta";
     elements.subtitle.textContent = isSignUp
-      ? "Use uma conta para recuperar futuras compras em outro aparelho."
-      : "Acesse sua conta sem conectar nenhuma carteira.";
+      ? "Proteja suas análises grátis e recupere compras em outro aparelho."
+      : "Proteja sua franquia e recupere compras sem conectar nenhuma carteira.";
     elements.submitLabel.textContent = isSignUp ? "Criar conta" : "Entrar com e-mail";
     elements.switchMode.textContent = isSignUp
       ? "Já tem conta? Entrar"

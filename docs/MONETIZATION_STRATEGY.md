@@ -404,3 +404,16 @@ publicar credenciais reais.
 
 Esta decisão adapta os frameworks de monetização, pricing, mapa de hipóteses e
 experimentos do projeto [phuryn/pm-skills](https://github.com/phuryn/pm-skills).
+
+### Clareza da conta e confiança — 22 de agosto de 2026
+
+Decisão: manter duas análises gratuitas por conta, pacote de 10 por R$ 4,90,
+ordem de consumo e checkout inalterados. A mudança desta rodada corrige somente
+a comunicação: análises reais exigem conta; exemplo e leitura da página não.
+Também torna o aviso de privacidade acessível no fluxo de autenticação.
+
+Hipótese: remover a expressão enganosa “conta opcional” reduz surpresa no primeiro
+uso sem diminuir materialmente a conclusão do cadastro. Medir futuramente apenas
+eventos pseudonimizados de abertura, início e confirmação do cadastro e início de
+análise. Nenhuma telemetria nova entra nesta rodada. Preço e pacote só serão
+reavaliados com comportamento real suficiente, conforme os critérios já definidos.
