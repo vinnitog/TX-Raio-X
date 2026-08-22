@@ -26,6 +26,7 @@ IDs de usuário, e-mails, hashes, carteiras, tokens e payloads não entram nesse
 - análise protegida: 10 chamadas por conta por minuto;
 - direitos da conta: 10 chamadas por conta em 10 minutos;
 - Supabase Auth: manter confirmação de e-mail e os limites de cadastro/login;
+- Supabase Auth Pro: ativar proteção contra senhas vazadas antes de receber contas de produção;
 - antes de produção: ativar Turnstile no Supabase e na interface com chaves próprias.
 
 Os contadores ficam no PostgreSQL, são serializados por conta e escopo e não usam
@@ -61,6 +62,23 @@ notificação assinada ou usar uma operação administrativa idempotente e audit
 ## Retenção operacional
 
 O job diário `tx-raio-x-operational-retention` remove rate limits com mais de 2 dias, pedidos de exclusão falhos com mais de 90 dias e reconcilia após 15 minutos uma solicitação `processing` cujo `user_id` já ficou nulo pela exclusão no Auth. A instalação automática ocorre somente quando `pg_cron` já está habilitado; confirmar a execução no painel antes da produção. Recibos de análise permanecem pela vida da conta porque removê-los reabriria a idempotência da franquia.
+
+## Security Advisor do Supabase
+
+- A função que ativa RLS automaticamente fica em `app_private`, fora dos schemas
+  expostos pela Data API, e não concede `EXECUTE` a `anon`, `authenticated` ou
+  `service_role`.
+- O event trigger cobre criação direta em `public`; não substitui `ENABLE ROW LEVEL
+  SECURITY` explícito nas migrations nem a revisão de tabelas movidas depois com
+  `ALTER TABLE ... SET SCHEMA`.
+- Após migrations de segurança, atualizar o Security Advisor e exigir zero aviso
+  não justificado de função `SECURITY DEFINER` executável por clientes. RPCs
+  intencionalmente expostas precisam de revisão, teste de isolamento e justificativa
+  registrada; mover uma função interna para `app_private` não dispensa essa análise.
+- A proteção contra senhas vazadas é uma configuração hospedada do Supabase Auth,
+  disponível no plano Pro. Ativá-la em **Authentication > Attack Protection**;
+  no plano gratuito, registrar o risco residual e não liberar produção com saldo
+  pago sem controle compensatório aprovado.
 
 ## Resposta a incidentes
 
