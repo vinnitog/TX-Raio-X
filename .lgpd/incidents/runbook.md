@@ -11,3 +11,12 @@ Base técnica: LGPD Art. 48 e Resolução CD/ANPD nº 15/2024. Confirmar prazos 
 7. Registrar decisão, comunicações, evidências, medidas e lições aprendidas pelo período normativo aplicável.
 
 Nunca colocar token, senha, chave, hash bruto, carteira ou payload integral de pagamento no registro de incidente versionado.
+
+## Acionamento e prazo
+
+- Iniciar o registro assim que houver suspeita razoável; não esperar confirmação total para conter.
+- O relógio regulatório deve ser contado pelo responsável designado conforme a Resolução CD/ANPD nº 15/2024. A referência operacional atual é de 3 dias úteis para incidente com risco ou dano relevante, sujeita à validação jurídica no caso concreto.
+- Se a comunicação inicial for incompleta, registrar por que e complementar dentro do prazo aplicável.
+- Manter um canal alternativo caso o domínio, Supabase ou provedor de e-mail esteja afetado.
+
+O roteiro de exercício está em `tabletop-2026-08-template.md`. Produção continua bloqueada até executar o tabletop com participantes e tempos reais.

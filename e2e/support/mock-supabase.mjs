@@ -103,7 +103,17 @@ export const supabase = {
     }], error: null };
   },
   functions: {
-    async invoke(name) {
+    async invoke(name, options = {}) {
+      if (name === "privacy-account") {
+        if (options.body?.action === "export") {
+          return { data: {
+            schemaVersion: 1,
+            account: { id: readSession()?.user?.id, email: readSession()?.user?.email },
+            orders: [], payments: [], creditLedger: []
+          }, error: null };
+        }
+        if (options.body?.action === "delete") return { data: { deleted: true }, error: null };
+      }
       if (name === "checkout") {
         return { data: {
           environment: "test",

@@ -1180,6 +1180,42 @@ select:focus-visible {
   background: rgb(183 243 107 / 10%);
 }
 
+.danger-button {
+  display: inline-flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  background: rgb(255 140 140 / 8%);
+  color: var(--danger);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.danger-button:hover {
+  background: rgb(255 140 140 / 16%);
+}
+
+.danger-button:focus-visible {
+  outline: 3px solid rgb(255 140 140 / 45%);
+  outline-offset: 3px;
+}
+
+.danger-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.danger-button.is-loading .button-spinner {
+  display: inline-block;
+  border-color: rgb(255 140 140 / 30%);
+  border-top-color: var(--danger);
+}
+
 footer {
   display: flex;
   flex-direction: column;
@@ -1398,6 +1434,17 @@ footer {
 
 .auth-account-links {
   margin: -4px 0 20px;
+}
+
+.privacy-actions {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.privacy-actions .secondary-button {
+  width: 100%;
+  min-height: 48px;
 }
 
 .auth-account-links a,

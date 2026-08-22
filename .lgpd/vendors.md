@@ -10,3 +10,5 @@
 | Cloudflare Turnstile | proteção de cadastro, se ativado | sinais de dispositivo/rede conforme fornecedor | alto | só ativar após mapear configuração, aviso, DPA e domínio definitivo |
 
 Tier e papel jurídico são avaliações iniciais, não conclusões contratuais.
+
+O procedimento de evidência e revisão está em `.lgpd/vendors/review-checklist.md`. Nenhum operador crítico está aprovado para produção apenas por constar neste inventário.

@@ -14,6 +14,7 @@ cliente:
 - `mercado_pago_webhook_request`: resultado, crédito/reversão e duração;
 - `consume_analysis_request`: endpoint legado de consumo, origem, idempotência e duração;
 - `protected_analysis_request`: validação, entrega protegida, origem gratuita/paga e duração.
+- `privacy_account`: exportação ou exclusão, código/status e duração, sem e-mail ou UUID de usuário.
 
 O identificador serve apenas para correlacionar suporte e logs. Mensagens internas,
 IDs de usuário, e-mails, hashes, carteiras, tokens e payloads não entram nesses logs.
@@ -23,6 +24,7 @@ IDs de usuário, e-mails, hashes, carteiras, tokens e payloads não entram nesse
 - checkout: 10 chamadas por conta em 10 minutos;
 - consumo: 30 chamadas por conta por minuto;
 - análise protegida: 10 chamadas por conta por minuto;
+- direitos da conta: 10 chamadas por conta em 10 minutos;
 - Supabase Auth: manter confirmação de e-mail e os limites de cadastro/login;
 - antes de produção: ativar Turnstile no Supabase e na interface com chaves próprias.
 
@@ -55,6 +57,10 @@ order by observed_at;
 
 Uma anomalia não deve ser corrigida com edição manual do ledger. Reprocessar a
 notificação assinada ou usar uma operação administrativa idempotente e auditada.
+
+## Retenção operacional
+
+O job diário `tx-raio-x-operational-retention` remove rate limits com mais de 2 dias, pedidos de exclusão falhos com mais de 90 dias e reconcilia após 15 minutos uma solicitação `processing` cujo `user_id` já ficou nulo pela exclusão no Auth. A instalação automática ocorre somente quando `pg_cron` já está habilitado; confirmar a execução no painel antes da produção. Recibos de análise permanecem pela vida da conta porque removê-los reabriria a idempotência da franquia.
 
 ## Resposta a incidentes
 

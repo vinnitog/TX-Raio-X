@@ -116,3 +116,7 @@ git diff --check
 - O site publicado não inclui o motor de análise nem os clientes RPC da análise por hash. Um cliente modificado precisa chamar a Edge Function autenticada, que aplica rate limit, confere saldo e só entrega o resultado após a finalização transacional. Como o repositório-fonte é público e os dados blockchain também são públicos, isso protege o serviço oficial e sua contabilidade, mas não pretende tornar o algoritmo propriedade secreta.
 - A estrategia comercial, hipoteses e criterios do experimento estao em `docs/MONETIZATION_STRATEGY.md`.
 - Mudancas futuras de preco, pacote, paywall ou checkout devem usar a skill local `tx-raio-x-monetization`.
+- Direitos técnicos da conta incluem exportação JSON autenticada e exclusão definitiva com confirmação digitada e sessão emitida recentemente; a exclusão remove o vínculo de usuário dos registros financeiros e apaga dados operacionais vinculados.
+- A retenção operacional remove rate limits após dois dias e pedidos de exclusão falhos após 90 dias; recibos pseudonimizados de análise duram a vida da conta para preservar idempotência e antifraude.
+- Produção continua bloqueada até identificar controlador/canal, validar juridicamente política e retenções, comprovar contratos/transferências dos operadores e executar o exercício de incidente documentado.
+- A exclusão automática da conta falha fechada quando existe saldo pago ou checkout não terminal; esses casos exigem resolução assistida para preservar valor e impedir aprovação órfã.

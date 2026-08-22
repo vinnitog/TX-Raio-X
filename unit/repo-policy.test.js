@@ -109,7 +109,7 @@ test("LGPD inventory preserves the product data-minimization invariants", () => 
 
   assert.match(dataMap, /hash\/resultado bruto não persistidos/);
   assert.match(dataMap, /não persistido pelo Tx Raio-X/);
-  assert.match(dataMap, /retenção de logs do provedor pendente/);
+  assert.match(dataMap, /logs do provedor pendentes|retenção de logs do provedor pendente/);
   for (const vendor of ["Supabase", "Mercado Pago", "Google", "GitHub Pages", "Blockscout"] ) {
     assert.match(vendors, new RegExp(vendor));
   }

@@ -35,7 +35,7 @@ jobs:
           mkdir -p _site/js
           cp index.html privacidade.html termos.html manifest.webmanifest sw.js _site/
           cp -R css icons _site/
-          cp js/app.mjs js/auth-config.mjs js/auth-controller.mjs js/auth-service.mjs _site/js/
+          cp js/app.mjs js/auth-config.mjs js/auth-controller.mjs js/auth-service.mjs js/privacy-client.mjs _site/js/
           cp js/checkout-client.mjs js/checkout-flow.mjs js/config.mjs _site/js/
           cp js/credit-client.mjs js/demo-analysis.mjs js/history-client.mjs _site/js/
           cp js/supabase-client.mjs js/usage.mjs _site/js/

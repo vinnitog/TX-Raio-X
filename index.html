@@ -329,10 +329,36 @@
         <nav class="auth-account-links" aria-label="Privacidade da conta">
           <a href="privacidade.html">Privacidade e dados da conta</a>
         </nav>
+        <p class="auth-feedback" id="privacy-feedback" role="status" aria-live="polite"></p>
+        <div class="privacy-actions">
+          <button class="secondary-button" id="privacy-export" type="button">
+            <span class="button-label">Baixar meus dados</span>
+            <span class="button-spinner" aria-hidden="true"></span>
+          </button>
+          <button class="danger-button" id="privacy-delete-start" type="button">Excluir minha conta</button>
+        </div>
         <button class="secondary-button auth-logout" id="auth-logout" type="button">
           <span class="button-label">Sair da conta</span>
           <span class="button-spinner" aria-hidden="true"></span>
         </button>
+      </section>
+
+      <section id="auth-delete-view" hidden>
+        <p class="section-label">Excluir conta</p>
+        <h2>Confirme a exclusão</h2>
+        <p class="auth-subtitle" id="privacy-delete-warning">A conta será excluída definitivamente. Para evitar perda de valor, a exclusão automática será bloqueada se houver saldo pago ou pagamento em andamento. Registros financeiros necessários serão preservados sem vínculo direto com a conta.</p>
+        <form class="auth-form" id="privacy-delete-form" novalidate>
+          <div class="field">
+            <label for="privacy-delete-confirmation">Digite o e-mail completo da conta</label>
+            <input id="privacy-delete-confirmation" type="email" autocomplete="off" aria-describedby="privacy-delete-warning privacy-delete-feedback" required>
+          </div>
+          <p class="auth-feedback" id="privacy-delete-feedback" role="status" aria-live="polite"></p>
+          <button class="danger-button" id="privacy-delete-confirm" type="submit">
+            <span class="button-label">Excluir conta definitivamente</span>
+            <span class="button-spinner" aria-hidden="true"></span>
+          </button>
+          <button class="auth-text-button" id="privacy-delete-cancel" type="button">Cancelar</button>
+        </form>
       </section>
 
       <section id="auth-recovery-view" hidden>

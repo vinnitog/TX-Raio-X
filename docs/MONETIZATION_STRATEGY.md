@@ -417,3 +417,11 @@ uso sem diminuir materialmente a conclusão do cadastro. Medir futuramente apena
 eventos pseudonimizados de abertura, início e confirmação do cadastro e início de
 análise. Nenhuma telemetria nova entra nesta rodada. Preço e pacote só serão
 reavaliados com comportamento real suficiente, conforme os critérios já definidos.
+
+### Preservação de valor na exclusão da conta — 22 de agosto de 2026
+
+Trabalho do usuário: encerrar a conta e exercer seus direitos sem perder uma compra já paga nem deixar um pagamento em andamento sem destino. A unidade de valor, a oferta de 10 análises por R$ 4,90 e a ordem de consumo não mudam.
+
+Foram comparados três tratamentos: apagar imediatamente e perder saldo (rejeitado por destruir direito pago); reembolsar automaticamente (adiado porque exige política financeira e integração específica); ou bloquear somente a exclusão automática quando existir saldo pago ou checkout não terminal, direcionando o caso para resolução assistida (escolhido por ser conservador e reversível). Contas sem compromisso financeiro continuam com exclusão self-service.
+
+Hipótese: o bloqueio evita crédito/reembolso órfão sem impedir a maioria dos pedidos. O evento estruturado existente é `privacy_account`, com resultado `error` e código categórico `account_has_financial_commitments`, sem e-mail, valor ou identificador financeiro. Critério: nenhuma conta com saldo positivo ou checkout aberto pode ser apagada automaticamente; contas com saldo zero e estados terminais devem concluir normalmente. Reversão: substituir o bloqueio pelo fluxo automático de reembolso apenas após validação jurídica, testes de idempotência e conciliação.
