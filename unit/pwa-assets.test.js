@@ -55,14 +55,14 @@ test("the installable entry point links the manifest and registers the service w
 test("service worker uses a versioned cache and includes wallet history code", () => {
   const serviceWorker = read("sw.js");
 
-  assert.match(serviceWorker, /const CACHE_NAME = ["']tx-raio-x-v49["'];/);
+  assert.match(serviceWorker, /const CACHE_NAME = ["']tx-raio-x-v50["'];/);
   assert.ok(
     appShellEntries().includes("./js/history-client.mjs"),
     "wallet history client should be cached for offline app startup"
   );
   assert.ok(
     appShellEntries().includes("./js/credit-client.mjs"),
-    "account credit client should be cached in service worker v49"
+    "account credit client should be cached in service worker v50"
   );
 });
 
@@ -84,6 +84,11 @@ test("optional account UI exposes accessible Google, email and recovery flows", 
   assert.match(index, /id=["']recovery-form["']/);
   assert.match(index, /id=["']auth-close["'][^>]*aria-label=["']Fechar["']/);
   assert.match(index, /class=["']skip-link["'][^>]*href=["']#main-content["']/);
+  assert.match(index, /\.skip-link:not\(:focus\)[\s\S]*?clip-path:\s*inset\(50%\)[\s\S]*?opacity:\s*0/);
+  assert.ok(
+    index.indexOf(".skip-link:not(:focus)") < index.indexOf('href="css/app.css"'),
+    "critical skip-link hiding must be parsed before the external stylesheet"
+  );
   assert.match(index, /<main[^>]*id=["']main-content["'][^>]*tabindex=["']-1["']/);
   assert.equal(
     [...index.matchAll(/href=["']privacidade\.html["']/g)].length,

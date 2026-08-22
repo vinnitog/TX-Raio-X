@@ -1,4 +1,4 @@
-const CACHE_NAME = "tx-raio-x-v49";
+const CACHE_NAME = "tx-raio-x-v50";
 const APP_SHELL = [
   "./",
   "./index.html",

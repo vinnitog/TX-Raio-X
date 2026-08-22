@@ -14,6 +14,46 @@ test("skip link is first in the keyboard order and moves focus to main content",
   await expect(page).toHaveURL(/#main-content$/);
 });
 
+for (const legalPage of [
+  { label: "privacidade", linkName: "Privacidade" },
+  { label: "termos", linkName: "Termos do beta" }
+]) {
+  test(`returning from ${legalPage.label} never exposes the unfocused skip link`, async ({ page }) => {
+    await mockSupabase(page);
+    await page.goto("/");
+    await page.getByRole("link", { name: legalPage.linkName, exact: true }).click();
+    await page.getByRole("link", { name: "Voltar ao Tx Raio-X" }).click();
+
+    const skipLink = page.locator(".skip-link");
+    await expect(skipLink).not.toBeFocused();
+    await expect(skipLink).toHaveCSS("opacity", "0");
+
+    await page.keyboard.press("Tab");
+    await expect(skipLink).toBeFocused();
+    await expect(skipLink).toBeVisible();
+    await expect(skipLink).toHaveCSS("opacity", "1");
+  });
+}
+
+test("history return at 320px keeps the skip link hidden until the first Tab", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 720 });
+  await mockSupabase(page);
+  await page.goto("/");
+  await page.getByRole("link", { name: "Privacidade", exact: true }).click();
+  await expect(page).toHaveURL(/\/privacidade\.html$/);
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/$/);
+
+  const skipLink = page.locator(".skip-link");
+  await expect(skipLink).not.toBeFocused();
+  await expect(skipLink).toHaveCSS("opacity", "0");
+
+  await page.keyboard.press("Tab");
+  await expect(skipLink).toBeFocused();
+  await expect(skipLink).toHaveCSS("opacity", "1");
+});
+
 test("guest privacy link receives focus and navigates from the auth dialog", async ({ page }) => {
   await mockSupabase(page);
   await page.goto("/");
