@@ -280,6 +280,20 @@ test("order store propagates insert and recovery errors", async () => {
   ), existingError);
 });
 
+test("order store exposes account erasure conflict without leaking database details", async () => {
+  const args = { userId: "user-1", idempotencyKey: "checkout:key-1", offer: CHECKOUT_OFFER };
+  await assert.rejects(
+    createOrGetOrderRecord(
+      orderStore({ insertError: { message: "account_erasure_in_progress", details: "private" } }).client,
+      args,
+      "id"
+    ),
+    (error) => error instanceof CheckoutHttpError
+      && error.status === 409
+      && error.code === "account_erasure_in_progress"
+  );
+});
+
 test("Supabase delegates JWT verification to the authenticated checkout handler", async () => {
   const config = await readFile("supabase/config.toml", "utf8");
   const handler = await readFile("supabase/functions/_shared/checkout.mjs", "utf8");

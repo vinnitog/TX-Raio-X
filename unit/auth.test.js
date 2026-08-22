@@ -60,15 +60,19 @@ function createFakeElement(initial = {}) {
 function createAuthElements() {
   const elements = {};
   for (const name of [
-    "trigger", "triggerLabel", "dialog", "close", "guestView", "accountView",
+    "trigger", "triggerLabel", "dialog", "close", "guestView", "accountView", "deleteView",
     "recoveryView", "googleButton", "form", "title", "subtitle", "email",
     "password", "submit", "submitLabel", "switchMode", "forgotPassword",
-    "feedback", "accountEmail", "logout", "recoveryForm", "recoveryPassword",
+    "feedback", "accountEmail", "logout", "privacyFeedback", "privacyExport",
+    "privacyDeleteStart", "privacyDeleteForm", "privacyDeleteConfirmation",
+    "privacyDeleteFeedback", "privacyDeleteConfirm", "privacyDeleteCancel",
+    "recoveryForm", "recoveryPassword",
     "recoveryConfirmation", "recoverySubmit", "recoveryFeedback"
   ]) {
     elements[name] = createFakeElement();
   }
   elements.accountView.hidden = true;
+  elements.deleteView.hidden = true;
   elements.recoveryView.hidden = true;
   elements.dialog.controls = [
     elements.close,
@@ -79,6 +83,11 @@ function createAuthElements() {
     elements.switchMode,
     elements.forgotPassword,
     elements.logout,
+    elements.privacyExport,
+    elements.privacyDeleteStart,
+    elements.privacyDeleteConfirmation,
+    elements.privacyDeleteConfirm,
+    elements.privacyDeleteCancel,
     elements.recoveryPassword,
     elements.recoveryConfirmation,
     elements.recoverySubmit
@@ -87,6 +96,7 @@ function createAuthElements() {
     elements.recoveryPassword.value = "";
     elements.recoveryConfirmation.value = "";
   };
+  elements.privacyDeleteForm.reset = () => { elements.privacyDeleteConfirmation.value = ""; };
   return elements;
 }
 
@@ -109,6 +119,10 @@ async function initController(elements, auth) {
   await initAuthController({
     elements,
     loadAuth: async () => auth,
+    loadPrivacy: async () => ({
+      exportAccount: async () => ({ schemaVersion: 1 }),
+      deleteAccount: async () => ({ deleted: true })
+    }),
     scheduleFrame: (callback) => callback()
   });
 }

@@ -55,14 +55,14 @@ test("the installable entry point links the manifest and registers the service w
 test("service worker uses a versioned cache and includes wallet history code", () => {
   const serviceWorker = read("sw.js");
 
-  assert.match(serviceWorker, /const CACHE_NAME = ["']tx-raio-x-v47["'];/);
+  assert.match(serviceWorker, /const CACHE_NAME = ["']tx-raio-x-v49["'];/);
   assert.ok(
     appShellEntries().includes("./js/history-client.mjs"),
     "wallet history client should be cached for offline app startup"
   );
   assert.ok(
     appShellEntries().includes("./js/credit-client.mjs"),
-    "account credit client should be cached in service worker v47"
+    "account credit client should be cached in service worker v49"
   );
 });
 
@@ -83,6 +83,15 @@ test("optional account UI exposes accessible Google, email and recovery flows", 
   assert.match(index, /id=["']auth-form["']/);
   assert.match(index, /id=["']recovery-form["']/);
   assert.match(index, /id=["']auth-close["'][^>]*aria-label=["']Fechar["']/);
+  assert.match(index, /class=["']skip-link["'][^>]*href=["']#main-content["']/);
+  assert.match(index, /<main[^>]*id=["']main-content["'][^>]*tabindex=["']-1["']/);
+  assert.equal(
+    [...index.matchAll(/href=["']privacidade\.html["']/g)].length,
+    3,
+    "privacy notice should remain reachable from the page footer and both account states"
+  );
+  assert.match(css, /\.skip-link:focus\s*\{[\s\S]*?transform:\s*translateY\(0\)/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.skip-link[\s\S]*?transition:\s*none/);
   assert.match(app, /initAuthController\(\{\s*onSessionChange:\s*refreshCreditEntitlement\s*\}\)/);
   assert.match(index, /class=["'][^"']*\busage-pill\b[^"']*["'][^>]*id=["']usage-pill["'][^>]*aria-live=["']polite["']/);
   assert.doesNotMatch(index, /id=["']auth-account-balance["']/);

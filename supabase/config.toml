@@ -16,6 +16,9 @@ verify_jwt = false
 [functions.analyze-transaction]
 verify_jwt = false
 
+[functions.privacy-account]
+verify_jwt = false
+
 [api]
 enabled = true
 # Port to use for the API URL.

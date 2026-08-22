@@ -24,6 +24,11 @@
   box-sizing: border-box;
 }
 
+::selection {
+  background: var(--primary);
+  color: var(--primary-ink);
+}
+
 html {
   scroll-behavior: smooth;
 }
@@ -46,8 +51,37 @@ select {
   font: inherit;
 }
 
+input,
+select {
+  caret-color: var(--primary);
+}
+
 button {
   touch-action: manipulation;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 100;
+  top: 12px;
+  left: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--primary);
+  color: var(--primary-ink);
+  font-weight: 800;
+  text-decoration: none;
+  transform: translateY(calc(-100% - 20px));
+}
+
+.skip-link:focus {
+  outline: 3px solid var(--text);
+  outline-offset: 3px;
+  transform: translateY(0);
+}
+
+#main-content:focus {
+  outline: none;
 }
 
 .site-header,
@@ -1146,6 +1180,42 @@ select:focus-visible {
   background: rgb(183 243 107 / 10%);
 }
 
+.danger-button {
+  display: inline-flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  background: rgb(255 140 140 / 8%);
+  color: var(--danger);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.danger-button:hover {
+  background: rgb(255 140 140 / 16%);
+}
+
+.danger-button:focus-visible {
+  outline: 3px solid rgb(255 140 140 / 45%);
+  outline-offset: 3px;
+}
+
+.danger-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.danger-button.is-loading .button-spinner {
+  display: inline-block;
+  border-color: rgb(255 140 140 / 30%);
+  border-top-color: var(--danger);
+}
+
 footer {
   display: flex;
   flex-direction: column;
@@ -1362,6 +1432,35 @@ footer {
   font-weight: 700;
 }
 
+.auth-account-links {
+  margin: -4px 0 20px;
+}
+
+.privacy-actions {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.privacy-actions .secondary-button {
+  width: 100%;
+  min-height: 48px;
+}
+
+.auth-account-links a,
+.auth-privacy-note a {
+  color: var(--info);
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+
+.auth-account-links a:focus-visible,
+.auth-privacy-note a:focus-visible {
+  border-radius: 4px;
+  outline: 3px solid rgb(114 215 245 / 60%);
+  outline-offset: 3px;
+}
+
 .paywall-dialog h2 {
   margin-bottom: 12px;
   font-size: 1.8rem;
@@ -1457,13 +1556,29 @@ footer {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  html {
+    scroll-behavior: auto;
+  }
+
+  .wallet-panel,
+  .result-card {
+    animation: none;
+  }
+
+  .toast,
+  .skip-link,
+  .wallet-toggle-arrow,
+  .primary-button,
+  .secondary-button,
+  .demo-button,
+  .dialog-later,
+  .dialog-close {
+    transition: none;
+  }
+
+  .button-spinner {
+    animation: none;
+    opacity: 0.65;
   }
 }
 

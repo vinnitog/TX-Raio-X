@@ -165,6 +165,9 @@ export async function createOrGetOrderRecord(
     }, { onConflict: "idempotency_key", ignoreDuplicates: true })
     .select(orderFields)
     .maybeSingle();
+  if (insertError?.message === "account_erasure_in_progress") {
+    throw new CheckoutHttpError(409, "account_erasure_in_progress", "Account deletion is in progress.");
+  }
   if (insertError) throw insertError;
   if (createdOrder) return { order: createdOrder, created: true };
 

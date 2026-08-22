@@ -44,6 +44,14 @@ beneficios pagos ou experimento comercial, usar primeiro:
 Registrar a decisao e os criterios do teste em `docs/MONETIZATION_STRATEGY.md`
 antes de alterar a interface ou a regra de uso.
 
+## Skills Adaptadas Do Projeto
+
+- Front-end: usar `.agents/skills/tx-raio-x-frontend-design/SKILL.md` em toda mudança de interface.
+- Privacidade/LGPD: usar `.agents/skills/tx-raio-x-lgpd/SKILL.md` antes de alterar autenticação, pagamentos, telemetria, fraude, dados ou fornecedores.
+- Produto e ideias: usar `.agents/skills/tx-raio-x-product-strategy/SKILL.md` em roadmap, posicionamento, ideação e experimentos; combinar com a skill de monetização quando houver preço, créditos ou gratuidade.
+
+As fontes, licenças e critérios de adaptação ficam registrados em `docs/SKILL_SOURCES.md`.
+
 ## Fluxo Obrigatorio De Desenvolvimento
 
 Toda mudanca de desenvolvimento deve seguir esta ordem:

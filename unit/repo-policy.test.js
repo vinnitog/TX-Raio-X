@@ -68,3 +68,52 @@ test("roadmap keeps authentication and paid access recoverable and private", () 
   assert.match(roadmap, /reautenticação/);
   assert.doesNotMatch(roadmap, /programa de convite|indicação automática/);
 });
+
+test("published copy never describes the account as optional", () => {
+  for (const file of ["index.html", "privacidade.html", "termos.html"]) {
+    assert.doesNotMatch(read(file), /conta opcional/i, file);
+  }
+  assert.match(read("index.html"), /A conta libera duas análises grátis uma única vez/);
+  assert.match(read("privacidade.html"), /Para realizar análises reais[^.]*é necessária uma conta/);
+});
+
+test("LGPD working papers remain explicit drafts and outside the published artifact", () => {
+  const requiredFiles = [
+    ".lgpd/data-map.md",
+    ".lgpd/legal-basis.md",
+    ".lgpd/vendors.md",
+    ".lgpd/gaps.md",
+    ".lgpd/STATUS.md",
+    ".lgpd/policies/privacy-policy-v1.0-draft.md"
+  ];
+  for (const file of requiredFiles) {
+    assert.ok(fs.existsSync(path.join(root, file)), `${file} should remain available for LGPD review`);
+  }
+
+  const status = read(".lgpd/STATUS.md");
+  const legalBasis = read(".lgpd/legal-basis.md");
+  const draft = read(".lgpd/policies/privacy-policy-v1.0-draft.md");
+  const workflow = read(".github/workflows/pages.yml");
+  assert.match(status, /\[ \] Política aprovada e publicada/);
+  assert.match(status, /não está publicado/i);
+  assert.match(legalBasis, /hipótese técnica; validar com profissional jurídico/i);
+  assert.match(draft, /Não publicado[^\n]*requer revisão do controlador\/jurídico/i);
+  assert.doesNotMatch(workflow, /\.lgpd|privacy-policy-v1\.0-draft/i);
+  assert.match(workflow, /cp index\.html privacidade\.html termos\.html/);
+});
+
+test("LGPD inventory preserves the product data-minimization invariants", () => {
+  const dataMap = read(".lgpd/data-map.md");
+  const vendors = read(".lgpd/vendors.md");
+  const gaps = read(".lgpd/gaps.md");
+
+  assert.match(dataMap, /hash\/resultado bruto não persistidos/);
+  assert.match(dataMap, /não persistido pelo Tx Raio-X/);
+  assert.match(dataMap, /logs do provedor pendentes|retenção de logs do provedor pendente/);
+  for (const vendor of ["Supabase", "Mercado Pago", "Google", "GitHub Pages", "Blockscout"] ) {
+    assert.match(vendors, new RegExp(vendor));
+  }
+  assert.match(gaps, /P0[^\n]*bloqueiam produção/i);
+  assert.match(gaps, /Identificar o controlador/);
+  assert.match(gaps, /Validar juridicamente bases, retenções e o rascunho/);
+});

@@ -1,5 +1,6 @@
 import { getAuthRedirectUrl } from "./auth-config.mjs";
 import { compactEmail, createAuthService, getAuthErrorMessage } from "./auth-service.mjs";
+import { createPrivacyClient, getPrivacyErrorMessage } from "./privacy-client.mjs";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MINIMUM_PASSWORD_LENGTH = 8;
@@ -12,6 +13,7 @@ function getElements() {
     close: document.querySelector("#auth-close"),
     guestView: document.querySelector("#auth-guest-view"),
     accountView: document.querySelector("#auth-account-view"),
+    deleteView: document.querySelector("#auth-delete-view"),
     recoveryView: document.querySelector("#auth-recovery-view"),
     googleButton: document.querySelector("#auth-google-button"),
     form: document.querySelector("#auth-form"),
@@ -26,6 +28,14 @@ function getElements() {
     feedback: document.querySelector("#auth-feedback"),
     accountEmail: document.querySelector("#auth-account-email"),
     logout: document.querySelector("#auth-logout"),
+    privacyFeedback: document.querySelector("#privacy-feedback"),
+    privacyExport: document.querySelector("#privacy-export"),
+    privacyDeleteStart: document.querySelector("#privacy-delete-start"),
+    privacyDeleteForm: document.querySelector("#privacy-delete-form"),
+    privacyDeleteConfirmation: document.querySelector("#privacy-delete-confirmation"),
+    privacyDeleteFeedback: document.querySelector("#privacy-delete-feedback"),
+    privacyDeleteConfirm: document.querySelector("#privacy-delete-confirm"),
+    privacyDeleteCancel: document.querySelector("#privacy-delete-cancel"),
     recoveryForm: document.querySelector("#recovery-form"),
     recoveryPassword: document.querySelector("#recovery-password"),
     recoveryConfirmation: document.querySelector("#recovery-password-confirmation"),
@@ -45,15 +55,32 @@ async function loadAuthService() {
   return createAuthService(supabase, getAuthRedirectUrl());
 }
 
+async function loadPrivacyService() {
+  const { supabase } = await import("./supabase-client.mjs");
+  return createPrivacyClient(supabase);
+}
+
+function downloadJson(data) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "tx-raio-x-meus-dados.json";
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export async function initAuthController({
   elements = getElements(),
   loadAuth = loadAuthService,
+  loadPrivacy = loadPrivacyService,
+  saveExport = downloadJson,
   scheduleFrame = requestAnimationFrame,
   onSessionChange = () => {}
 } = {}) {
   if (!elements.trigger || !elements.dialog) return;
 
   let auth;
+  let privacy;
   let mode = "sign-in";
   let currentSession = null;
   let busy = false;
@@ -70,7 +97,7 @@ export async function initAuthController({
       control.disabled = isBusy;
     }
     elements.dialog.setAttribute("aria-busy", String(isBusy));
-    for (const control of [elements.googleButton, elements.submit, elements.logout, elements.recoverySubmit]) {
+    for (const control of [elements.googleButton, elements.submit, elements.logout, elements.recoverySubmit, elements.privacyExport, elements.privacyDeleteConfirm]) {
       control.classList.remove("is-loading");
     }
     activeControl?.classList.toggle("is-loading", isBusy);
@@ -91,8 +118,8 @@ export async function initAuthController({
     const isSignUp = mode === "sign-up";
     elements.title.textContent = isSignUp ? "Crie sua conta" : "Entre na sua conta";
     elements.subtitle.textContent = isSignUp
-      ? "Use uma conta para recuperar futuras compras em outro aparelho."
-      : "Acesse sua conta sem conectar nenhuma carteira.";
+      ? "Proteja suas análises grátis e recupere compras em outro aparelho."
+      : "Proteja sua franquia e recupere compras sem conectar nenhuma carteira.";
     elements.submitLabel.textContent = isSignUp ? "Criar conta" : "Entrar com e-mail";
     elements.switchMode.textContent = isSignUp
       ? "Já tem conta? Entrar"
@@ -108,6 +135,7 @@ export async function initAuthController({
     const signedIn = Boolean(session?.user);
     elements.guestView.hidden = signedIn;
     elements.accountView.hidden = !signedIn;
+    elements.deleteView.hidden = true;
     elements.recoveryView.hidden = true;
     elements.trigger.classList.toggle("is-authenticated", signedIn);
     elements.triggerLabel.textContent = signedIn ? compactEmail(email) : "Entrar";
@@ -125,15 +153,22 @@ export async function initAuthController({
       elements.accountView.hidden = true;
       elements.recoveryView.hidden = false;
       setFeedback("", false, elements.recoveryFeedback);
+    } else if (view === "delete") {
+      elements.guestView.hidden = true;
+      elements.accountView.hidden = true;
+      elements.recoveryView.hidden = true;
+      elements.deleteView.hidden = false;
+      elements.privacyDeleteForm.reset();
+      setFeedback("", false, elements.privacyDeleteFeedback);
     } else {
       renderSession(currentSession);
       renderMode();
     }
     if (!elements.dialog.open) elements.dialog.showModal();
     scheduleFrame(() => {
-      const target = view === "recovery"
-        ? elements.recoveryPassword
-        : currentSession?.user ? elements.logout : elements.googleButton;
+      const target = view === "recovery" ? elements.recoveryPassword
+        : view === "delete" ? elements.privacyDeleteConfirmation
+          : currentSession?.user ? elements.privacyExport : elements.googleButton;
       target.focus();
     });
   }
@@ -248,6 +283,40 @@ export async function initAuthController({
     elements.dialog.close();
   });
 
+  elements.privacyExport.addEventListener("click", async () => {
+    setFeedback("", false, elements.privacyFeedback);
+    const response = await runAuthRequest(() => privacy.exportAccount(), elements.privacyExport);
+    if (response?.error) {
+      setFeedback(getPrivacyErrorMessage(response.error), true, elements.privacyFeedback);
+      return;
+    }
+    saveExport(response);
+    setFeedback("Arquivo preparado com os dados vinculados à sua conta.", false, elements.privacyFeedback);
+  });
+
+  elements.privacyDeleteStart.addEventListener("click", () => openDialog("delete"));
+  elements.privacyDeleteCancel.addEventListener("click", () => openDialog("default"));
+  elements.privacyDeleteForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const confirmation = elements.privacyDeleteConfirmation.value.trim();
+    if (confirmation.toLowerCase() !== (currentSession?.user?.email ?? "").toLowerCase()) {
+      setFeedback("Digite exatamente o e-mail da conta.", true, elements.privacyDeleteFeedback);
+      elements.privacyDeleteConfirmation.focus();
+      return;
+    }
+    const response = await runAuthRequest(
+      () => privacy.deleteAccount(confirmation),
+      elements.privacyDeleteConfirm
+    );
+    if (response?.error) {
+      setFeedback(getPrivacyErrorMessage(response.error), true, elements.privacyDeleteFeedback);
+      return;
+    }
+    await auth.signOut().catch(() => {});
+    renderSession(null);
+    elements.dialog.close();
+  });
+
   elements.recoveryForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const password = elements.recoveryPassword.value;
@@ -276,6 +345,7 @@ export async function initAuthController({
 
   try {
     auth = await loadAuth();
+    privacy = await loadPrivacy();
     auth.onAuthStateChange((event, session) => {
       if (event === "PASSWORD_RECOVERY") recoveryMode = true;
       renderSession(session);
