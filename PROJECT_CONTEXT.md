@@ -121,3 +121,4 @@ git diff --check
 - Produção continua bloqueada até identificar controlador/canal, validar juridicamente política e retenções, comprovar contratos/transferências dos operadores e executar o exercício de incidente documentado.
 - A exclusão automática da conta falha fechada quando existe saldo pago ou checkout não terminal; esses casos exigem resolução assistida para preservar valor e impedir aprovação órfã.
 - O atalho de teclado para o conteúdo principal possui ocultação crítica inline: continua acessível no primeiro Tab e não aparece sem estilo ao voltar das páginas legais durante uma troca de cache do PWA.
+- O event trigger que ativa RLS em novas tabelas públicas executa uma função `SECURITY DEFINER` no schema interno `app_private`, sem `EXECUTE` para papéis da Data API; proteção contra senhas vazadas permanece requisito operacional de produção dependente do Supabase Pro.

@@ -10,6 +10,7 @@
 ## P1 — antes de aceitar usuários de produção
 
 - Aplicar e testar remotamente a migration e Edge Function de exportação/exclusão já implementadas.
+- Ativar a proteção do Supabase Auth contra senhas vazadas no plano Pro; se o ambiente permanecer no plano gratuito, aprovar formalmente controles compensatórios antes de vincular saldo pago a login por senha.
 - Definir com jurídico/comercial o fluxo assistido para saldo pago e pagamentos pendentes; a exclusão automática já falha fechada nesses casos para impedir crédito ou reembolso órfão.
 - Validar juridicamente a matriz de retenção; confirmar o Cron e configurar/evidenciar retenção de logs nos fornecedores.
 - Definir idade mínima/público-alvo e tratamento de eventual conta de menor.
