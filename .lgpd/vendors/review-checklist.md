@@ -2,7 +2,7 @@
 
 Revisar no onboarding e sempre que contrato, região, subprocessador ou finalidade mudar.
 
-Para Supabase, Mercado Pago, Google OAuth e GitHub Pages, guardar evidência datada de:
+Para Supabase, Stripe, Google OAuth e GitHub Pages, guardar evidência datada de:
 
 - contrato/termos e DPA aplicável;
 - papel das partes (controlador/operador ou controlador independente);

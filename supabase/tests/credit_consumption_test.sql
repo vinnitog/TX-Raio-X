@@ -8,27 +8,28 @@ insert into auth.users (id) values
   ('50000000-0000-4000-8000-000000000002');
 
 insert into public.orders (
-  id, user_id, provider, idempotency_key, status,
+  id, user_id, provider, provider_environment, provider_price_id, idempotency_key, status,
   package_code, package_credits, amount_cents, currency
 ) values (
   '60000000-0000-4000-8000-000000000001',
   '50000000-0000-4000-8000-000000000001',
-  'mercado_pago', 'test:credit:order:1', 'checkout_ready',
+  'stripe', 'test', 'price_testpack10', 'stripe:test:credit:order:1', 'payment_rejected',
   'analysis_pack_10', 10, 490, 'BRL'
 ), (
   '60000000-0000-4000-8000-000000000002',
   '50000000-0000-4000-8000-000000000001',
-  'mercado_pago', 'test:credit:order:2', 'checkout_ready',
+  'stripe', 'test', 'price_testpack10', 'stripe:test:credit:order:2', 'payment_rejected',
   'analysis_pack_10', 10, 490, 'BRL'
 ), (
   '60000000-0000-4000-8000-000000000003',
   '50000000-0000-4000-8000-000000000001',
-  'mercado_pago', 'test:credit:order:3', 'checkout_ready',
+  'stripe', 'test', 'price_testpack10', 'stripe:test:credit:order:3', 'payment_rejected',
   'analysis_pack_10', 10, 490, 'BRL'
 );
 
-select * from public.process_mercado_pago_payment(
-  '60000000-0000-4000-8000-000000000001', '6001', 'approved', null,
+select * from public.process_stripe_payment(
+  'evt_creditapproval1', 'test', 'checkout.session.completed',
+  '60000000-0000-4000-8000-000000000001', 'pi_creditpayment1', 'approved', null,
   490, 0, 'BRL', '2026-08-01T10:00:00Z', '2026-08-01T10:00:00Z'
 );
 
@@ -129,8 +130,9 @@ select extensions.results_eq(
   'paid balance is consumed only after the free grant is exhausted'
 );
 
-select * from public.process_mercado_pago_payment(
-  '60000000-0000-4000-8000-000000000001', '6001', 'refunded', null,
+select * from public.process_stripe_payment(
+  'evt_creditrefund1', 'test', 'charge.refunded',
+  '60000000-0000-4000-8000-000000000001', 'pi_creditpayment1', 'refunded', null,
   490, 490, 'BRL', '2026-08-01T10:00:00Z', '2026-08-01T11:00:00Z'
 );
 
@@ -144,8 +146,9 @@ select extensions.results_eq(
 reset role;
 
 -- Repurchase restores only the net paid balance after the prior consumption/refund.
-select * from public.process_mercado_pago_payment(
-  '60000000-0000-4000-8000-000000000002', '6002', 'approved', null,
+select * from public.process_stripe_payment(
+  'evt_creditapproval2', 'test', 'checkout.session.completed',
+  '60000000-0000-4000-8000-000000000002', 'pi_creditpayment2', 'approved', null,
   490, 0, 'BRL', '2026-08-01T12:00:00Z', '2026-08-01T12:00:00Z'
 );
 select extensions.results_eq(
@@ -160,8 +163,9 @@ select * from public.consume_analysis_credit(
   '50000000-0000-4000-8000-000000000001',
   '70000000-0000-4000-8000-000000000007'
 );
-select * from public.process_mercado_pago_payment(
-  '60000000-0000-4000-8000-000000000002', '6002', 'charged_back', null,
+select * from public.process_stripe_payment(
+  'evt_creditdispute2', 'test', 'charge.dispute.created',
+  '60000000-0000-4000-8000-000000000002', 'pi_creditpayment2', 'charged_back', null,
   490, 490, 'BRL', '2026-08-01T12:00:00Z', '2026-08-01T13:00:00Z'
 );
 select extensions.results_eq(
@@ -172,8 +176,9 @@ select extensions.results_eq(
   'chargeback after consumption clamps the recoverable balance and removes paid access'
 );
 
-select * from public.process_mercado_pago_payment(
-  '60000000-0000-4000-8000-000000000003', '6003', 'approved', null,
+select * from public.process_stripe_payment(
+  'evt_creditapproval3', 'test', 'checkout.session.completed',
+  '60000000-0000-4000-8000-000000000003', 'pi_creditpayment3', 'approved', null,
   490, 0, 'BRL', '2026-08-01T14:00:00Z', '2026-08-01T14:00:00Z'
 );
 select extensions.results_eq(

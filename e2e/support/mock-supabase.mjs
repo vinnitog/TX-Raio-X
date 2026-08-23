@@ -118,7 +118,7 @@ export const supabase = {
         return { data: {
           environment: "test",
           orderId: "20000000-0000-4000-8000-000000000001",
-          checkoutUrl: "https://sandbox.mercadopago.com/checkout/v1/redirect/e2e"
+          checkoutUrl: "https://checkout.stripe.com/c/pay/cs_test_e2echeckout"
         }, error: null };
       }
       if (name === "consume-analysis") {

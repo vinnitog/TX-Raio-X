@@ -84,18 +84,19 @@ que HTML e módulos JavaScript de versões diferentes permaneçam misturados.
 
 O endpoint `supabase/functions/checkout` exige uma
 sessão Supabase válida, recebe `POST { "packageCode": "analysis_pack_10" }` com um
-header `Idempotency-Key` em UUID v4, cria a ordem e só então cria uma preferência
-do Mercado Pago. Preço, quantidade de análises, moeda, retorno e webhook não são
+header `Idempotency-Key` em UUID v4, cria a ordem e só então cria uma sessão do
+Stripe Checkout. Preço, quantidade de análises, moeda e retorno não são
 aceitos do navegador.
 
 Configure apenas credenciais de teste. Copie
 `supabase/functions/.env.example` para um arquivo local ignorado pelo Git e defina:
 
 ```text
-MERCADO_PAGO_ENVIRONMENT=test
-MERCADO_PAGO_ACCESS_TOKEN=<access token de teste>
+STRIPE_ENVIRONMENT=test
+STRIPE_SECRET_KEY=<sk_test_...>
+STRIPE_WEBHOOK_SECRET=<whsec_... do endpoint de teste>
+STRIPE_PRICE_ANALYSIS_PACK_10=<price_... de R$ 4,90>
 CHECKOUT_RETURN_URL=<URL HTTPS do site de teste>
-MERCADO_PAGO_WEBHOOK_URL=<URL HTTPS da futura função mercado-pago-webhook>
 CHECKOUT_ALLOWED_ORIGINS=<origens HTTPS separadas por vírgula>
 ```
 
@@ -105,20 +106,24 @@ função:
 ```powershell
 supabase secrets set --env-file .\supabase\functions\.env.local
 supabase functions deploy checkout
+supabase functions deploy stripe-webhook
 ```
 
-A função recusa qualquer ambiente diferente de `test` e retorna apenas o
-`sandbox_init_point`. O webhook assinado consulta o pagamento diretamente no
-Mercado Pago e concede ou reverte saldo por RPC transacional idempotente;
+A função recusa qualquer ambiente diferente de `test` e aceita somente uma
+credencial `sk_test_`. O webhook assinado consulta o recurso diretamente na
+Stripe e concede ou reverte saldo por RPC transacional idempotente;
 parâmetros das URLs de retorno nunca aprovam uma compra.
 
 Fora de localhost, os CTAs carregam a sessão Supabase, pedem login quando
 necessário e invocam a função com uma chave de idempotência por tentativa. O botão
 fica indisponível durante a criação para impedir cliques duplicados. O retorno do
-Checkout Pro apenas informa o estado do teste; não adiciona análises no navegador.
+Stripe Checkout apenas informa o estado do teste; não adiciona análises no navegador.
 
 A produção permanece bloqueada até a configuração do CAPTCHA, revisão final de
 segredos/políticas/alertas, smoke manual completo e confirmação da tarifa efetiva.
+O roteiro de homologação e o corte remoto da integração anterior estão em
+docs/STRIPE_E2E.md. A remoção remota só ocorre depois do smoke Stripe, para não
+interromper a conciliação durante a troca.
 
 ## Análise protegida
 

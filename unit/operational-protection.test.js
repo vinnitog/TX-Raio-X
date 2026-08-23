@@ -28,7 +28,7 @@ test("structured telemetry correlates responses without logging messages or user
   const handlers = [
     read("supabase/functions/_shared/checkout.mjs"),
     read("supabase/functions/_shared/consume-analysis.mjs"),
-    read("supabase/functions/_shared/mercado-pago-webhook.mjs")
+    read("supabase/functions/_shared/stripe-webhook.mjs")
   ].join("\n");
   assert.match(telemetry, /X-Request-Id/);
   assert.match(telemetry, /durationMs/);

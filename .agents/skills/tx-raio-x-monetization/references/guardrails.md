@@ -6,7 +6,7 @@
 - Aquisição: majoritariamente self-service e sem relacionamento humano.
 - Promessa: explicar dados públicos; não custodiar, conectar carteira ou recomendar investimentos.
 - Entrada gratuita: duas análises completas.
-- Checkout planejado: Mercado Pago Checkout Pro com Pix.
+- Checkout atual: Stripe Checkout hospedado, em pagamento único e sem assinatura.
 - Estágio atual: validação de disposição a pagar, não maximização de receita.
 
 ## Decisões atuais

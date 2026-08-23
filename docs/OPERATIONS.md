@@ -11,7 +11,7 @@ As Edge Functions emitem um evento por requisição e devolvem `X-Request-Id` ao
 cliente:
 
 - `checkout_request`: `success`, `ignored` ou `error`, com status, código e duração;
-- `mercado_pago_webhook_request`: resultado, crédito/reversão e duração;
+- `stripe_webhook_request`: resultado, crédito/reversão e duração;
 - `consume_analysis_request`: endpoint legado de consumo, origem, idempotência e duração;
 - `protected_analysis_request`: validação, entrega protegida, origem gratuita/paga e duração.
 - `privacy_account`: exportação ou exclusão, código/status e duração, sem e-mail ou UUID de usuário.
@@ -83,7 +83,15 @@ O job diário `tx-raio-x-operational-retention` remove rate limits com mais de 2
 ## Resposta a incidentes
 
 1. Identificar função, código e `X-Request-Id`.
-2. Conferir ordem e pagamento no Mercado Pago e no Supabase, sem copiar PII para o chamado.
+2. Conferir ordem e pagamento na Stripe e no Supabase, sem copiar PII para o chamado.
 3. Pausar publicação/credenciais de produção se houver crédito indevido, assinatura inválida aceita ou vazamento de segredo.
 4. Preservar logs e horários; nunca registrar access token para reproduzir.
 5. Corrigir e validar aprovação, repetição, reembolso e chargeback antes de reabrir o fluxo.
+
+## Corte do provedor anterior
+
+Depois do smoke Stripe, excluir a Edge Function remota `mercado-pago-webhook`,
+remover todos os secrets `MERCADO_PAGO_*` do Supabase e apagar a URL de notificações
+no painel anterior. Validar com `supabase functions list` e `supabase secrets list`.
+Não apagar ordens, pagamentos ou ledger históricos; eles permanecem para
+conciliação e retenção.

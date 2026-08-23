@@ -1,5 +1,7 @@
 # Auditoria funcional, de edge cases e seguranca
 
+> Status histórico: este relatório descreve a integração Mercado Pago desativada em 22/08/2026; não é documentação do fluxo Stripe atual.
+
 Data: 2026-07-31
 
 Escopo: PWA, autenticacao Supabase, banco/RLS, Edge Function de checkout,

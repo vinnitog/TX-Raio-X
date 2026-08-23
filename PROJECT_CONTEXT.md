@@ -1,4 +1,4 @@
-﻿# PROJECT_CONTEXT.md - TxRaioX
+# PROJECT_CONTEXT.md - TxRaioX
 
 Gerado em: 2026-07-28 17:04:23
 
@@ -99,18 +99,18 @@ git diff --check
 - A busca por endereco lista transacoes normais indexadas e nao deve ser apresentada como historico contabil completo.
 - A busca por carteira permanece em um painel recolhivel abaixo do analisador por hash.
 - O bloco "Como funciona" permanece ao final da pagina, depois da area principal do produto.
-- Direcao de pagamento escolhida para producao: Mercado Pago Checkout Pro com Pix, mantendo validacao server-side.
+- Direcao de pagamento escolhida em 22 de agosto de 2026: Stripe Checkout em pagamento unico, mantendo validacao server-side; registros anteriores do sandbox do Mercado Pago ficam apenas como historico imutavel.
 - A evolucao pos-validacao esta registrada em `ROADMAP.md`: conta recuperavel com Login com Google e alternativa de e-mail/senha.
 - O direito de acesso pago e a franquia gratuita são persistidos no ledger e recuperados por conta.
 - A migration inicial do Supabase para ordens, pagamentos e ledger foi aplicada no projeto de desenvolvimento com RLS, idempotencia e reversao integral; o lint remoto do schema public foi aprovado antes do checkout.
 - O PWA integra Supabase Auth com Google, e-mail/senha, sessão persistente, logout e recuperação de senha; compras e saldo do ledger são recuperados pela conta autenticada, inclusive em outro navegador.
-- A Edge Function `checkout` cria uma ordem autenticada antes da preferência do Mercado Pago, aceita somente o pacote configurado e permanece bloqueada no ambiente de testes; naquela etapa inicial o webhook ainda não concedia créditos.
+- A Edge Function `checkout` cria uma ordem autenticada antes da sessão do Stripe, aceita somente o pacote configurado e permanece bloqueada no ambiente de testes.
 - O checkout valida o JWT assimétrico da sessão dentro da Edge Function com `auth.getUser`, antes do body e de qualquer efeito financeiro; a verificação legada do gateway fica desativada somente nessa função.
 - Tentativas de checkout são preservadas por conta no navegador e o formato anterior é migrado sem trocar a chave. Recompra continua bloqueada até o webhook confirmar estado terminal e autorizar a rotação server-side.
 - A versão 2 da Edge Function `checkout` foi publicada no ambiente de testes com autenticação manual e smoke remoto aprovado para CORS e rejeição de sessão ausente/inválida; o checkout autenticado real ainda deve ser validado pelo site.
-- O primeiro pagamento aprovado no sandbox confirmou o redirecionamento; o checkout passa a abrir em nova aba com fallback seguro, limpa todos os parâmetros conhecidos do Mercado Pago no retorno e evita registrar como erro o conflito idempotente esperado ao recuperar a mesma ordem. A Edge Function refinada foi publicada e passou nos smokes remotos de CORS e autenticação; o retorno não concede créditos antes do webhook.
-- O webhook de teste do Mercado Pago valida a assinatura HMAC antes de qualquer efeito, consulta o pagamento pela API e confere ambiente, vendedor, ordem, valor e moeda. Uma RPC transacional restrita ao `service_role` atualiza pagamento e ordem e concede ou reverte o pacote no ledger com idempotência.
-- O probe vazio do painel do Mercado Pago é reconhecido sem efeitos financeiros; notificações reais continuam assinadas. O `live_mode` esperado é configurado explicitamente porque pagamentos da conta vendedora de teste atual são reportados como `true`, enquanto ambiente e collector permanecem fixados ao teste.
+- O fluxo anterior do Mercado Pago foi desativado no código; seus registros de sandbox permanecem apenas como histórico financeiro imutável até a política de retenção autorizar outra medida.
+- O Stripe Checkout abre em nova aba com fallback seguro, mantém no servidor o Price e o retrato comercial da ordem e limpa somente os parâmetros Stripe conhecidos no retorno. Nenhum retorno do navegador concede créditos.
+- O webhook Stripe valida assinatura sobre o corpo bruto, relê os recursos na API, rejeita ambiente/ordem/preço/valor/moeda divergentes e usa uma RPC transacional idempotente para atualizar pagamento, ordem e ledger.
 - A franquia gratuita e o saldo pago são derivados do ledger da conta. A Edge Function `analyze-transaction` consulta e interpreta a transação no backend; a RPC de finalização consome primeiro `free_consumption` e depois `consumption`, com serialização e idempotência por UUID. Tentativas incertas preservam o mesmo identificador no `sessionStorage`, troca de conta falha fechada e recompra só gira a chave após ordem terminal confirmada por RLS.
 - O cabeçalho apresenta o saldo pago recuperado ao lado da franquia grátis restante, sem esconder a compra na modal da conta e sem somar as duas origens em um total ambíguo.
 - O site publicado não inclui o motor de análise nem os clientes RPC da análise por hash. Um cliente modificado precisa chamar a Edge Function autenticada, que aplica rate limit, confere saldo e só entrega o resultado após a finalização transacional. Como o repositório-fonte é público e os dados blockchain também são públicos, isso protege o serviço oficial e sua contabilidade, mas não pretende tornar o algoritmo propriedade secreta.

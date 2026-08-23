@@ -3,7 +3,8 @@
 | Serviço | Função | Dados potenciais | Risco inicial | Pendência antes da produção |
 | --- | --- | --- | --- | --- |
 | Supabase | autenticação, banco, Edge Functions e logs | conta, billing, ledger, controles operacionais | crítico | região, DPA, subprocessadores, retenção e transferência |
-| Mercado Pago | checkout, pagamento e webhook | dados de pagamento e identificadores do pedido | crítico | contrato, retenção, incidentes, subprocessadores e taxas reais |
+| Stripe | checkout, pagamento e webhook | dados de pagamento e identificadores do pedido | crítico | contrato, DPA, retenção, incidentes, subprocessadores, transferências e taxas reais |
+| Mercado Pago (desativado) | histórico de testes anterior à migração | identificadores financeiros históricos no Supabase | legado | não recebe novos dados; definir retenção do histórico de sandbox |
 | Google | login OAuth opcional | e-mail, identificador e perfil básico | alto | configuração OAuth, termos/DPA aplicáveis e transferência |
 | GitHub Pages | hospedagem estática | logs técnicos/IP conforme plataforma | médio | retenção, subprocessadores e transferência |
 | Blockscout/RPCs públicos | consulta de blockchain | hash/rede; endereço público em busca | médio | endpoints finais, políticas e logs de cada operador |

@@ -55,14 +55,14 @@ test("the installable entry point links the manifest and registers the service w
 test("service worker uses a versioned cache and includes wallet history code", () => {
   const serviceWorker = read("sw.js");
 
-  assert.match(serviceWorker, /const CACHE_NAME = ["']tx-raio-x-v50["'];/);
+  assert.match(serviceWorker, /const CACHE_NAME = ["']tx-raio-x-v51["'];/);
   assert.ok(
     appShellEntries().includes("./js/history-client.mjs"),
     "wallet history client should be cached for offline app startup"
   );
   assert.ok(
     appShellEntries().includes("./js/credit-client.mjs"),
-    "account credit client should be cached in service worker v50"
+    "account credit client should be cached in service worker v51"
   );
 });
 

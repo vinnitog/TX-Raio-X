@@ -2,10 +2,7 @@ const LEGACY_CHECKOUT_ATTEMPT_KEY = "txraiox_checkout_attempt_v1";
 const CHECKOUT_ATTEMPTS_KEY = "txraiox_checkout_attempts_v2";
 const PACKAGE_CODE = "analysis_pack_10";
 const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const TEST_CHECKOUT_HOSTS = new Set([
-  "sandbox.mercadopago.com",
-  "sandbox.mercadopago.com.br"
-]);
+const TEST_CHECKOUT_HOSTS = new Set(["checkout.stripe.com"]);
 const RESOLVED_ORDER_STATUSES = new Set([
   "payment_approved",
   "payment_cancelled",
@@ -92,7 +89,7 @@ async function isAttemptResolved(client, userId, idempotencyKey) {
       .from("orders")
       .select("status")
       .eq("user_id", userId)
-      .eq("idempotency_key", `checkout:${idempotencyKey}`)
+      .eq("idempotency_key", `stripe:test:checkout:${idempotencyKey}`)
       .maybeSingle();
     if (result.error) return false;
     return RESOLVED_ORDER_STATUSES.has(result.data?.status);

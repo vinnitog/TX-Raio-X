@@ -10,9 +10,11 @@
 - [x] Autenticar/vincular o Supabase CLI e aplicar a migration no projeto de desenvolvimento.
 - [x] Criar a Edge Function de checkout bloqueada em modo de teste.
 - [x] Configurar a credencial de teste e publicar a Edge Function no projeto de desenvolvimento.
-- [x] Integrar o redirecionamento autenticado do PWA ao Checkout Pro de teste.
-- [x] Executar e conferir a primeira ordem/preferência real no fluxo autenticado.
-- [x] Implementar e validar o webhook idempotente do Mercado Pago.
+- [x] Remover do código o fluxo ativo legado do Mercado Pago, preservando o histórico financeiro.
+- [ ] Após o smoke Stripe, excluir a função/secrets e o endpoint remoto do Mercado Pago.
+- [x] Implementar Stripe Checkout e webhook idempotente em código, bloqueados em teste.
+- [ ] Configurar Price, secrets e endpoint Stripe no projeto Supabase de desenvolvimento.
+- [ ] Executar a matriz manual completa no Stripe test mode.
 - [x] Mover consumo pago para uma Edge Function transacional.
 - [x] Cobrir pagamento, webhook repetido, reembolso integral, chargeback e troca de aparelho em testes automatizados; manter o smoke manual final antes da produção.
 - [x] Registrar taxas e margem do pacote e excluir boleto; reconfirmar a tarifa efetiva da conta antes da produção.
@@ -58,8 +60,8 @@ navegador, aparelho e limpeza dos dados locais.
 - Validação confere identificador único, produto, valor, moeda e status, com
   proteção contra replay; preferencialmente por webhook assinado e confirmação
   direta no provedor.
-- Provedor planejado: Mercado Pago Checkout Pro com Pix, criado pelo backend e
-  confirmado por notificação/webhook mais consulta direta quando necessário.
+- Provedor escolhido: Stripe Checkout em pagamento único, criado pelo backend e
+  confirmado por webhook assinado mais consulta direta quando necessário.
 - `localStorage` usado apenas como cache de conveniência, nunca como fonte
   definitiva do acesso pago.
 - O cache terá expiração e uma política explícita para indisponibilidade do

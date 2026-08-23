@@ -76,8 +76,8 @@ test("checkout tab opens synchronously without an opener and navigates after che
 
   assert.deepEqual(browser.calls, [["open", "about:blank", "_blank"]]);
   assert.equal(browser.tab.opener, null);
-  assert.equal(checkoutTab.navigate("https://sandbox.mercadopago.com/checkout/pref-1"), true);
-  assert.deepEqual(browser.calls.at(-1), ["replace", "https://sandbox.mercadopago.com/checkout/pref-1"]);
+  assert.equal(checkoutTab.navigate("https://checkout.stripe.com/c/pay/cs_test_one"), true);
+  assert.deepEqual(browser.calls.at(-1), ["replace", "https://checkout.stripe.com/c/pay/cs_test_one"]);
 });
 
 test("checkout tab fails closed when popup or delayed navigation is unavailable", async () => {
@@ -85,11 +85,11 @@ test("checkout tab fails closed when popup or delayed navigation is unavailable"
   assert.equal(openCheckoutTab(fakeCheckoutWindow({ blocked: true }).window), null);
 
   const closed = fakeCheckoutWindow({ closed: true });
-  assert.equal(openCheckoutTab(closed.window).navigate("https://sandbox.mercadopago.com/checkout"), false);
+  assert.equal(openCheckoutTab(closed.window).navigate("https://checkout.stripe.com/c/pay/cs_test_one"), false);
   assert.equal(closed.calls.some(([name]) => name === "replace"), false);
 
   const rejected = fakeCheckoutWindow({ replaceThrows: true });
-  assert.equal(openCheckoutTab(rejected.window).navigate("https://sandbox.mercadopago.com/checkout"), false);
+  assert.equal(openCheckoutTab(rejected.window).navigate("https://checkout.stripe.com/c/pay/cs_test_one"), false);
 });
 
 test("checkout tab is discarded when opener isolation cannot be guaranteed", async () => {
@@ -109,7 +109,7 @@ test("failed popup and same-tab navigation is contained and closes the auxiliary
   const { navigateToCheckout, openCheckoutTab } = await import("../js/checkout-flow.mjs");
   const browser = fakeCheckoutWindow({ replaceThrows: true });
   const checkoutTab = openCheckoutTab(browser.window);
-  const destination = navigateToCheckout(checkoutTab, "https://sandbox.mercadopago.com/checkout", {
+  const destination = navigateToCheckout(checkoutTab, "https://checkout.stripe.com/c/pay/cs_test_one", {
     assign() { throw new Error("same-tab navigation blocked"); }
   });
   assert.equal(destination, "failed");
@@ -127,12 +127,12 @@ test("failed or blocked new-tab navigation closes it before same-tab fallback", 
     const checkoutTab = openCheckoutTab(browser.window);
     const destination = navigateToCheckout(
       checkoutTab,
-      "https://sandbox.mercadopago.com/checkout/pref-1",
+      "https://checkout.stripe.com/c/pay/cs_test_one",
       { assign: (url) => assignments.push(url) }
     );
 
     assert.equal(destination, "same_tab");
-    assert.deepEqual(assignments, ["https://sandbox.mercadopago.com/checkout/pref-1"]);
+    assert.deepEqual(assignments, ["https://checkout.stripe.com/c/pay/cs_test_one"]);
     if (checkoutTab) assert.equal(browser.tab.closed, true);
   }
 });
@@ -206,24 +206,24 @@ for (const status of ["success", "pending", "failure"]) {
     const usage = { freeUsed: 2, credits: 7, unlocked: false };
     const before = structuredClone(usage);
     const result = sanitizeCheckoutReturn(
-      `https://app.example.com/?campaign=beta&checkout_status=${status}&payment_id=123&status=approved#result`
+      `https://app.example.com/?campaign=beta&checkout_status=${status}&session_id=cs_test_123&source=checkout#result`
     );
     const cleaned = new URL(result.cleanedUrl);
 
     assert.equal(result.status, status);
     assert.equal(cleaned.searchParams.get("campaign"), "beta");
     assert.equal(cleaned.searchParams.has("checkout_status"), false);
-    assert.equal(cleaned.searchParams.has("payment_id"), false);
-    assert.equal(cleaned.searchParams.has("status"), false);
+    assert.equal(cleaned.searchParams.has("session_id"), false);
+    assert.equal(cleaned.searchParams.has("source"), false);
     assert.equal(cleaned.hash, "#result");
     assert.deepEqual(usage, before);
   });
 }
 
-test("checkout return removes every Mercado Pago parameter observed in sandbox", async () => {
+test("checkout return removes every Stripe return parameter", async () => {
   const { sanitizeCheckoutReturn } = await import("../js/checkout-flow.mjs");
   const result = sanitizeCheckoutReturn(
-    "https://app.example.com/?campaign=beta&checkout_status=success&collection_id=123&collection_status=approved&payment_id=123&status=approved&external_reference=order-1&merchant_order_id=456&preference_id=pref-1&payment_type=account_money&site_id=MLB&processing_mode=aggregator&merchant_account_id=null#result"
+    "https://app.example.com/?campaign=beta&checkout_status=success&session_id=cs_test_123&source=checkout#result"
   );
   const cleaned = new URL(result.cleanedUrl);
 
@@ -235,14 +235,14 @@ test("checkout return removes every Mercado Pago parameter observed in sandbox",
 test("checkout return preserves Supabase auth parameters and fragment", async () => {
   const { sanitizeCheckoutReturn } = await import("../js/checkout-flow.mjs");
   const result = sanitizeCheckoutReturn(
-    "https://app.example.com/?checkout_status=success&payment_id=123&code=auth-code&type=recovery&next=%2Faccount#recovery"
+    "https://app.example.com/?checkout_status=success&session_id=cs_test_123&source=checkout&code=auth-code&type=recovery&next=%2Faccount#recovery"
   );
   const cleaned = new URL(result.cleanedUrl);
 
   assert.equal(cleaned.searchParams.get("code"), "auth-code");
   assert.equal(cleaned.searchParams.get("type"), "recovery");
   assert.equal(cleaned.searchParams.get("next"), "/account");
-  assert.equal(cleaned.searchParams.has("payment_id"), false);
+  assert.equal(cleaned.searchParams.has("session_id"), false);
   assert.equal(cleaned.hash, "#recovery");
 });
 
@@ -257,7 +257,7 @@ test("ordinary auth return without checkout marker is left untouched", async () 
 test("checkout return cleanup never interrupts initialization when history throws", async () => {
   const { replaceCheckoutReturn, sanitizeCheckoutReturn } = await import("../js/checkout-flow.mjs");
   const usage = { credits: 4, freeUsed: 2 };
-  const result = sanitizeCheckoutReturn("https://app.example.com/?checkout_status=success&payment_id=123");
+  const result = sanitizeCheckoutReturn("https://app.example.com/?checkout_status=success&session_id=cs_test_123&source=checkout");
   assert.equal(replaceCheckoutReturn({
     replaceState() { throw new Error("history blocked"); }
   }, result.cleanedUrl), false);
@@ -304,9 +304,9 @@ test("closed tab while checkout waits falls back once to same-tab navigation", a
   const second = await runCheckoutAttempt(options);
   assert.deepEqual(second, { status: "busy" });
   browser.tab.closed = true;
-  resolveCheckout({ status: "ready", checkoutUrl: "https://sandbox.mercadopago.com/checkout/pref-1" });
+  resolveCheckout({ status: "ready", checkoutUrl: "https://checkout.stripe.com/c/pay/cs_test_one" });
   assert.deepEqual(await first, { status: "same_tab" });
   assert.equal(starts, 1);
-  assert.deepEqual(assignments, ["https://sandbox.mercadopago.com/checkout/pref-1"]);
+  assert.deepEqual(assignments, ["https://checkout.stripe.com/c/pay/cs_test_one"]);
   assert.equal(buttons.every((button) => button.disabled), true);
 });
