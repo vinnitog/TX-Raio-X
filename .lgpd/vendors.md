@@ -7,6 +7,7 @@
 | Mercado Pago (desativado) | histórico de testes anterior à migração | identificadores financeiros históricos no Supabase | legado | não recebe novos dados; definir retenção do histórico de sandbox |
 | Google | login OAuth opcional | e-mail, identificador e perfil básico | alto | configuração OAuth, termos/DPA aplicáveis e transferência |
 | GitHub Pages | hospedagem estática | logs técnicos/IP conforme plataforma | médio | retenção, subprocessadores e transferência |
+| Railway | hospedagem estática em container Caddy e logs de acesso minimizados | IP mascarado, rota, método, status, user agent e metadados técnicos conforme plataforma | médio | região, DPA, retenção, subprocessadores, transferência e limites de custo antes do domínio definitivo |
 | Blockscout/RPCs públicos | consulta de blockchain | hash/rede; endereço público em busca | médio | endpoints finais, políticas e logs de cada operador |
 | Cloudflare Turnstile | proteção de cadastro, se ativado | sinais de dispositivo/rede conforme fornecedor | alto | só ativar após mapear configuração, aviso, DPA e domínio definitivo |
 

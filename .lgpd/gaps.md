@@ -5,6 +5,7 @@
 - Identificar o controlador e publicar um canal válido para titulares/encarregado.
 - Validar juridicamente bases, retenções e o rascunho de política.
 - Verificar contratos/DPA, regiões, subprocessadores e transferências internacionais dos operadores críticos.
+- Registrar evidência contratual e de retenção do Railway antes de torná-lo o domínio definitivo; manter logs minimizados e sem query strings.
 - Executar o tabletop documentado, preencher responsáveis de plantão e registrar tempos/evidências.
 
 ## P1 — antes de aceitar usuários de produção
