@@ -125,12 +125,23 @@ O roteiro de homologação e o corte remoto da integração anterior estão em
 docs/STRIPE_E2E.md. A remoção remota só ocorre depois do smoke Stripe, para não
 interromper a conciliação durante a troca.
 
+## Deploy no Railway
+
+O repositório inclui `Dockerfile`, `Caddyfile` e `railway.json`. O Railway serve
+somente a allowlist pública do PWA, usa a porta dinâmica da plataforma e valida
+`/health`. Não configure secrets Stripe ou `service_role` no Railway: pagamentos,
+ledger e análises protegidas continuam nas Edge Functions do Supabase.
+
+Após conectar o repositório e obter a URL HTTPS, atualize os redirects do Supabase
+Auth e os secrets `CHECKOUT_RETURN_URL` e `CHECKOUT_ALLOWED_ORIGINS`. O passo a
+passo, controles de custo e smoke estão em `docs/RAILWAY_DEPLOYMENT.md`.
+
 ## Análise protegida
 
 No site hospedado, a consulta RPC e o motor determinístico executam na Edge
 Function `analyze-transaction`. Ela valida sessão, origem, rate limit e saldo, e
 só retorna o resultado depois que uma RPC transacional registra o consumo. O
-artefato do GitHub Pages é montado por lista permitida e não publica funções,
+artefato público do GitHub Pages e do Railway é montado por lista permitida e não publica funções,
 migrations, testes ou o motor usado no backend.
 
 ## Testes

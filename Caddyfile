@@ -1,0 +1,84 @@
+{
+	admin off
+	persist_config off
+	auto_https off
+
+	log {
+		format json
+	}
+
+	servers {
+		trusted_proxies static private_ranges 100.0.0.0/8
+	}
+}
+
+:{$PORT:3000} {
+	log {
+		format filter {
+			request>remote_ip ip_mask 24 48
+			request>client_ip ip_mask 24 48
+			request>headers>X-Real-Ip delete
+			request>headers>X-Forwarded-For delete
+			request>headers>Forwarded delete
+			request>headers>Cf-Connecting-Ip delete
+			request>headers>True-Client-Ip delete
+			request>headers>Authorization delete
+			request>headers>Proxy-Authorization delete
+			request>headers>Cookie delete
+			request>uri regexp \?.*$ ""
+			wrap json
+		}
+	}
+
+	encode zstd gzip
+	root * /srv
+
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'sha256-+2KxJzD6A/3OkRRoCWIAVmy1xjwuSFlP80RBSchN2T4='; img-src 'self' data:; connect-src 'self' https://pvonnavvdegzorykioxw.supabase.co wss://pvonnavvdegzorykioxw.supabase.co https://eth.blockscout.com https://base.blockscout.com https://arbitrum.blockscout.com https://polygon.blockscout.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+	}
+
+	handle /health {
+		header Cache-Control "no-store"
+		respond 200
+	}
+
+	handle /sw.js {
+		header Cache-Control "no-cache, no-store, must-revalidate"
+		file_server
+	}
+
+	handle /manifest.webmanifest {
+		header Cache-Control "no-cache"
+		file_server
+	}
+
+	@html path / /index.html /privacidade.html /termos.html
+	handle @html {
+		header Cache-Control "public, max-age=0, must-revalidate"
+		file_server
+	}
+
+	handle /css/* {
+		header Cache-Control "public, max-age=0, must-revalidate"
+		file_server
+	}
+
+	handle /js/* {
+		header Cache-Control "public, max-age=0, must-revalidate"
+		file_server
+	}
+
+	handle /icons/* {
+		header Cache-Control "public, max-age=0, must-revalidate"
+		file_server
+	}
+
+	handle {
+		file_server
+	}
+}

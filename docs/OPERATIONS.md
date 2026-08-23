@@ -34,6 +34,14 @@ IP ou fingerprint do aparelho. Somente `service_role` pode chamar a função de
 limite. Isso reduz automação simples, mas não prova que duas contas pertencem à
 mesma pessoa.
 
+## Hospedagem Railway
+
+O Railway executa apenas o container Caddy com a allowlist pública do PWA. O
+healthcheck é `/health`; nenhuma credencial Stripe, `service_role`, migration ou
+função backend entra na imagem. Os logs Caddy usam IP mascarado, removem headers de
+IP encaminhados e descartam a query string. Retenção e região continuam pendentes de evidência do
+fornecedor. O roteiro de deploy e smoke está em `docs/RAILWAY_DEPLOYMENT.md`.
+
 ## Alertas mínimos
 
 Criar alertas no provedor de logs para janelas de 5 minutos:

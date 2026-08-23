@@ -23,7 +23,7 @@ As bases legais propostas e os critérios de retenção constam nos artefatos in
 
 ## Compartilhamentos
 
-Supabase presta autenticação, banco, funções e logs; Google participa somente quando o login Google é escolhido; Stripe processa checkout/pagamento; Blockscout e provedores RPC respondem consultas públicas; GitHub Pages hospeda os arquivos estáticos. Regiões, subprocessadores e mecanismos de transferência precisam ser confirmados antes da publicação.
+Supabase presta autenticação, banco, funções e logs; Google participa somente quando o login Google é escolhido; Stripe processa checkout/pagamento; Blockscout e provedores RPC respondem consultas públicas; Railway hospeda os arquivos estáticos em container e o GitHub Pages permanece durante a transição. Regiões, subprocessadores e mecanismos de transferência precisam ser confirmados antes da publicação.
 
 ## Retenção e eliminação
 
