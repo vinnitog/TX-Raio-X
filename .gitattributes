@@ -1,0 +1,30 @@
+# togs-orchestrator:attributes:start
+# Keep orchestrator-managed third-party snapshots byte-stable across platforms.
+.agents/skills/diagnosing-bugs/** -text -whitespace
+.agents/skills/tdd/** -text -whitespace
+.agents/skills/codebase-design/** -text -whitespace
+.agents/skills/domain-modeling/** -text -whitespace
+.agents/skills/javascript-testing-patterns/** -text -whitespace
+.agents/skills/e2e-testing-patterns/** -text -whitespace
+.agents/skills/accessibility-compliance/** -text -whitespace
+.agents/skills/supabase/** -text -whitespace
+.agents/skills/supabase-postgres-best-practices/** -text -whitespace
+.agents/skills/use-railway/** -text -whitespace
+.agents/skills/stripe-integration/** -text -whitespace
+.agents/skills/sast-configuration/** -text -whitespace
+.agents/skills/grill-me/** -text -whitespace
+.claude/skills/diagnosing-bugs/** -text -whitespace
+.claude/skills/tdd/** -text -whitespace
+.claude/skills/codebase-design/** -text -whitespace
+.claude/skills/domain-modeling/** -text -whitespace
+.claude/skills/javascript-testing-patterns/** -text -whitespace
+.claude/skills/e2e-testing-patterns/** -text -whitespace
+.claude/skills/accessibility-compliance/** -text -whitespace
+.claude/skills/supabase/** -text -whitespace
+.claude/skills/supabase-postgres-best-practices/** -text -whitespace
+.claude/skills/use-railway/** -text -whitespace
+.claude/skills/stripe-integration/** -text -whitespace
+.claude/skills/sast-configuration/** -text -whitespace
+.claude/skills/grill-me/** -text -whitespace
+.togs/licenses/** -text -whitespace
+# togs-orchestrator:attributes:end

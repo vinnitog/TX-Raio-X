@@ -128,3 +128,17 @@ O objetivo e nao repetir ciclos improdutivos de Browser quando o bloqueio e do a
 - Use `git add -- <arquivo...>` com lista explicita; nao use `git add .` em worktree sujo.
 - Se ja existir PR `develop -> main`, atualize/comente o PR existente em vez de tentar criar duplicado.
 - Se houver service worker/cache, incremente a versao do cache quando HTML/CSS/JS mudar.
+
+<!-- togs-orchestrator:start -->
+## Orquestracao Central
+
+Este repositorio e um no independente gerenciado pelo hub `togs-backoffice` com o id `cripto-project`. Quando um caminho local for necessario, resolva-o pelo control plane ou pela variavel `TOGS_BACKOFFICE_PATH`; nao publique paths de usuario neste repositorio.
+
+Antes de alterar codigo, testes, documentacao ou configuracao:
+
+1. Leia `.togs\orchestrator.json` para confirmar responsabilidade e capacidades.
+2. Leia `SKILLS_MANAGED.md` e ative somente skills compativeis com a tarefa.
+3. Preserve a independencia deste repositorio: nao importe codigo diretamente de outro projeto e nao compartilhe historico Git.
+
+O hub pode auditar e sincronizar metadados/skills, mas nao pode commitar, fazer push, merge, deploy ou remover arquivos deste repositorio automaticamente.
+<!-- togs-orchestrator:end -->
