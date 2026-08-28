@@ -45,8 +45,8 @@ fornecedor. O roteiro de deploy e smoke está em `docs/RAILWAY_DEPLOYMENT.md`.
 ## Branch protection da `main`
 
 O workflow `Quality Gate` executa unitários, jornadas Playwright e pgTAP contra
-um Postgres efêmero. Depois que o primeiro run concluir no GitHub, configurar a
-regra da branch `main` com:
+um Postgres efêmero. A regra da branch `main`, ativada em 28 de agosto de 2026,
+exige:
 
 - pull request obrigatório com 0 aprovações exigidas enquanto houver apenas um
   colaborador, pois o autor não pode aprovar o próprio PR;
@@ -54,10 +54,10 @@ regra da branch `main` com:
 - conversa de revisão resolvida antes do merge;
 - force push e exclusão da branch desabilitados.
 
-Não aplicar a regra a `develop`: o fluxo do projeto permite push direto nessa
-branch e exige PR revisado de `develop` para `main`. A configuração remota da
-proteção é uma ação manual separada; este repositório apenas prepara o check e o
-runbook.
+Não aplicar a regra a `develop`: ela permanece sem proteção porque o fluxo do
+projeto permite push direto nessa branch e exige PR revisado de `develop` para
+`main`. Ao alterar a proteção remota, revalidar este runbook e confirmar o estado
+pelas configurações ou pela API do GitHub.
 
 ## Alertas mínimos
 

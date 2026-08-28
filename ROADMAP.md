@@ -22,7 +22,7 @@
 - [x] Mover consulta e análise por hash para Edge Function protegida, com consumo transacional antes da entrega.
 - [ ] Configurar CAPTCHA/Turnstile após obter as chaves do domínio hospedado.
 - [x] Preparar o quality gate de PR para unitários, Playwright e pgTAP em Postgres efêmero.
-- [ ] Ativar no GitHub a proteção da `main` com PR e check `quality-gate` obrigatórios; exigir 0 aprovações enquanto houver apenas um colaborador.
+- [x] Ativar no GitHub a proteção da `main` com PR e check `quality-gate` obrigatórios; exigir 0 aprovações enquanto houver apenas um colaborador.
 
 ## Agora: validar o produto
 
