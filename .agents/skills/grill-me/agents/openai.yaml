@@ -1,0 +1,5 @@
+interface:
+  display_name: "Grill Me"
+  short_description: "Elimine suposicoes antes de executar"
+policy:
+  allow_implicit_invocation: false

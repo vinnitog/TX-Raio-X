@@ -16,6 +16,7 @@ Este arquivo e gerado pelo hub `togs-backoffice`. O caminho local do control pla
 | `use-railway` | `railwayapp/railway-skills` | railway, deploy, logs, environment |
 | `stripe-integration` | `wshobson/agents` | stripe, payments, subscriptions, webhook |
 | `sast-configuration` | `wshobson/agents` | auth, personal-data, payments, security, ci |
+| `grill-me` | `mattpocock/skills` | explicit-invocation, requirements, plan, design, decision |
 
 ## Licencas
 

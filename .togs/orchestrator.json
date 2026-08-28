@@ -28,7 +28,8 @@
     "supabase-postgres-best-practices",
     "use-railway",
     "stripe-integration",
-    "sast-configuration"
+    "sast-configuration",
+    "grill-me"
   ],
   "sources": [
     {

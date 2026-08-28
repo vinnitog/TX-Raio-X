@@ -12,6 +12,7 @@
 .agents/skills/use-railway/** -text -whitespace
 .agents/skills/stripe-integration/** -text -whitespace
 .agents/skills/sast-configuration/** -text -whitespace
+.agents/skills/grill-me/** -text -whitespace
 .claude/skills/diagnosing-bugs/** -text -whitespace
 .claude/skills/tdd/** -text -whitespace
 .claude/skills/codebase-design/** -text -whitespace
@@ -24,5 +25,6 @@
 .claude/skills/use-railway/** -text -whitespace
 .claude/skills/stripe-integration/** -text -whitespace
 .claude/skills/sast-configuration/** -text -whitespace
+.claude/skills/grill-me/** -text -whitespace
 .togs/licenses/** -text -whitespace
 # togs-orchestrator:attributes:end
