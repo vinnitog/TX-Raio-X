@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "managedBy": "togs-backoffice",
+  "hubLocator": "TOGS_BACKOFFICE_PATH",
+  "projectId": "cripto-project",
+  "responsibility": "Produto de analise de transacoes cripto com autenticacao e pagamentos.",
+  "lifecycle": "active",
+  "capabilities": [
+    "frontend",
+    "auth",
+    "personal-data",
+    "crypto",
+    "payments",
+    "supabase",
+    "postgres",
+    "railway",
+    "e2e"
+  ],
+  "skills": [
+    "diagnosing-bugs",
+    "tdd",
+    "codebase-design",
+    "domain-modeling",
+    "javascript-testing-patterns",
+    "e2e-testing-patterns",
+    "accessibility-compliance",
+    "supabase",
+    "supabase-postgres-best-practices",
+    "use-railway",
+    "stripe-integration",
+    "sast-configuration"
+  ],
+  "sources": [
+    {
+      "repository": "mattpocock/skills",
+      "commit": "6654f6b60cd9d5be8b54c6fafe44346dabeb3b76",
+      "license": "MIT",
+      "licenseFile": ".togs/licenses/mattpocock-skills-MIT.txt"
+    },
+    {
+      "repository": "wshobson/agents",
+      "commit": "38e19c20d2b154510b0e624a2e3e186b19b5c527",
+      "license": "MIT",
+      "licenseFile": ".togs/licenses/wshobson-agents-MIT.txt"
+    },
+    {
+      "repository": "supabase/agent-skills",
+      "commit": "8331f910845103c08d51f6ca1d86ebb7d1f745e3",
+      "license": "MIT",
+      "licenseFile": ".togs/licenses/supabase-agent-skills-MIT.txt"
+    },
+    {
+      "repository": "railwayapp/railway-skills",
+      "commit": "5d1e97178f86c82795d6737928bd641e0552166a",
+      "license": "MIT",
+      "licenseFile": ".togs/licenses/railway-skills-MIT.txt"
+    }
+  ],
+  "policy": {
+    "repositoryOwnsCodeAndGitHistory": true,
+    "crossProjectImportsAllowed": false,
+    "orchestratorMayCommitOrPush": false,
+    "syncIsAdditive": true
+  }
+}
