@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select extensions.plan(21);
+select extensions.plan(22);
 
 insert into auth.users (id) values ('10000000-0000-4000-8000-000000000001');
 insert into public.orders (
@@ -49,7 +49,23 @@ select extensions.is(
   '20000000-0000-4000-8000-000000000001',
   'account-scoped checkout reuses the existing open order'
 );
-select extensions.is((select count(*)::integer from public.orders where user_id = '10000000-0000-4000-8000-000000000001' and status = 'checkout_ready'), 1, 'only one open checkout exists per account');
+select extensions.is(
+  public.create_or_get_stripe_checkout_order(
+    '10000000-0000-4000-8000-000000000001', 'test',
+    'stripe:test:checkout:30000000-0000-4000-8000-000000000098',
+    'analysis_pack_10', 10, 490, 'BRL', 'price_testpack10'
+  )->'order'->>'provider_checkout_session_id',
+  'cs_test_abcdefgh1234',
+  'a new browser key still recovers the existing Checkout Session for the account'
+);
+select extensions.is(
+  (select count(*)::integer from public.orders
+   where user_id = '10000000-0000-4000-8000-000000000001'
+     and provider = 'stripe' and provider_environment = 'test'
+     and status in ('creating_checkout', 'checkout_unknown', 'checkout_ready')),
+  1,
+  'only one open checkout exists per account'
+);
 
 -- a failed card attempt keeps the same Checkout Session reusable
 select extensions.lives_ok($$ select * from public.process_stripe_payment('evt_carddeclined1','test','payment_intent.payment_failed','20000000-0000-4000-8000-000000000001','pi_payment1234','rejected','card_declined',490,0,'BRL',null,now()) $$, 'card failure is recorded');
