@@ -13,13 +13,16 @@
 - [x] Remover do código o fluxo ativo legado do Mercado Pago, preservando o histórico financeiro.
 - [ ] Após o smoke Stripe, excluir a função/secrets e o endpoint remoto do Mercado Pago.
 - [x] Implementar Stripe Checkout e webhook idempotente em código, bloqueados em teste.
-- [ ] Configurar Price, secrets e endpoint Stripe no projeto Supabase de desenvolvimento.
+- [x] Configurar Price, secrets e endpoint Stripe no projeto Supabase de desenvolvimento.
+- [x] Validar o checkout Stripe autenticado e o crédito de 10 análises no ambiente de teste.
 - [ ] Executar a matriz manual completa no Stripe test mode.
 - [x] Mover consumo pago para uma Edge Function transacional.
 - [x] Cobrir pagamento, webhook repetido, reembolso integral, chargeback e troca de aparelho em testes automatizados; manter o smoke manual final antes da produção.
 - [x] Registrar taxas e margem do pacote e excluir boleto; reconfirmar a tarifa efetiva da conta antes da produção.
 - [x] Mover consulta e análise por hash para Edge Function protegida, com consumo transacional antes da entrega.
 - [ ] Configurar CAPTCHA/Turnstile após obter as chaves do domínio hospedado.
+- [x] Preparar o quality gate de PR para unitários, Playwright e pgTAP em Postgres efêmero.
+- [x] Ativar no GitHub a proteção da `main` com PR e check `quality-gate` obrigatórios; exigir 0 aprovações enquanto houver apenas um colaborador.
 
 ## Agora: validar o produto
 

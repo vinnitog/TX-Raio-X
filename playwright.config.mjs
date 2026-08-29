@@ -11,7 +11,7 @@ export default defineConfig({
   use: {
     baseURL: "http://txraiox.test:4173",
     browserName: "chromium",
-    channel: "chrome",
+    channel: process.env.CI ? undefined : "chrome",
     headless: true,
     serviceWorkers: "block",
     launchOptions: {

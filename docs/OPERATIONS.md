@@ -42,6 +42,23 @@ função backend entra na imagem. Os logs Caddy usam IP mascarado, removem heade
 IP encaminhados e descartam a query string. Retenção e região continuam pendentes de evidência do
 fornecedor. O roteiro de deploy e smoke está em `docs/RAILWAY_DEPLOYMENT.md`.
 
+## Branch protection da `main`
+
+O workflow `Quality Gate` executa unitários, jornadas Playwright e pgTAP contra
+um Postgres efêmero. A regra da branch `main`, ativada em 28 de agosto de 2026,
+exige:
+
+- pull request obrigatório com 0 aprovações exigidas enquanto houver apenas um
+  colaborador, pois o autor não pode aprovar o próprio PR;
+- status check obrigatório `quality-gate` atualizado antes do merge;
+- conversa de revisão resolvida antes do merge;
+- force push e exclusão da branch desabilitados.
+
+Não aplicar a regra a `develop`: ela permanece sem proteção porque o fluxo do
+projeto permite push direto nessa branch e exige PR revisado de `develop` para
+`main`. Ao alterar a proteção remota, revalidar este runbook e confirmar o estado
+pelas configurações ou pela API do GitHub.
+
 ## Alertas mínimos
 
 Criar alertas no provedor de logs para janelas de 5 minutos:

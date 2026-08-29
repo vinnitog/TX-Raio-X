@@ -5,6 +5,10 @@ sem habilitar produção. Use apenas `sk_test_`, Price de teste e endpoint de te
 
 ## Configuração
 
+Estado confirmado em 28 de agosto de 2026: Price, secrets, endpoint, checkout
+autenticado e crédito de 10 análises estão validados no ambiente de teste. A
+matriz completa abaixo e os gates de produção continuam pendentes.
+
 1. No Dashboard Stripe em modo de teste, crie um produto para o pacote de 10
    análises e um preço único de **R$ 4,90 BRL**. Copie o `price_...`.
 2. Crie o endpoint:

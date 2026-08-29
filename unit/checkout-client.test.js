@@ -510,7 +510,7 @@ test("an in-memory attempt is persisted when blocked storage recovers", async ()
   );
 });
 
-test("audit reproduction: blocked storage plus reload currently replaces the unresolved key", async () => {
+test("blocked storage plus reload delegates a new key to account-scoped backend recovery", async () => {
   const { createCheckoutClient } = await import("../js/checkout-client.mjs");
   const storage = createStorage({ blocked: true });
   const first = createSupabase({ invoke: async () => ({ data: null, error: new Error("offline") }) });
@@ -528,5 +528,3 @@ test("audit reproduction: blocked storage plus reload currently replaces the unr
   assert.equal(afterReload.calls[0].options.headers["Idempotency-Key"], idTwo);
   assert.notEqual(afterReload.calls[0].options.headers["Idempotency-Key"], idOne);
 });
-
-test.todo("blocked storage preserves an unresolved attempt after reload");
